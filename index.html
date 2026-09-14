@@ -1,6 +1,27 @@
 <!DOCTYPE html>
 <html lang="fr">
 <head>
+<script>
+(function(){
+    if (window._cpReadOnlyGuardInstalled) return;
+    window._cpReadOnlyGuardInstalled = true;
+    var _cpOrigSetItem = Storage.prototype.setItem;
+    Storage.prototype.setItem = function(key, value) {
+        if (this === window.localStorage && key !== 'covo_current_user') {
+            try {
+                var cu = JSON.parse(window.localStorage.getItem('covo_current_user') || 'null');
+                if (cu && cu.readOnly === true) {
+                    if (typeof window.showScanToast === 'function') {
+                        window.showScanToast('👁️ Mode consultation seule — sauvegarde désactivée par l\'Admin-Développeur', 'info');
+                    }
+                    return;
+                }
+            } catch(e) {}
+        }
+        return _cpOrigSetItem.apply(this, arguments);
+    };
+})();
+</script>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1">
 <title>Gestion Pro — COVO</title>
@@ -167,13 +188,27 @@
 </head>
 <body>
 
+<div id="cp-access-gate" style="display:none;position:fixed;inset:0;z-index:100000;background:#0a0a0a;color:#fff;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:24px;gap:16px;">
+    <div style="font-size:3rem;">🔒</div>
+    <div id="cp-access-gate-title" style="font-size:1.2rem;font-weight:900;"></div>
+    <div id="cp-access-gate-msg" style="font-size:0.9rem;color:#ccc;max-width:420px;line-height:1.5;"></div>
+    <a id="cp-access-gate-link" href="https://aliand0810.github.io/Covo-pro/" target="covopro" style="display:none;text-decoration:none;background:linear-gradient(135deg,#1f2937,#131922);color:#fff;padding:10px 22px;border-radius:9px;font-weight:800;font-size:0.9rem;">🔑 Se connecter dans COVO Pro</a>
+</div>
+
 <div id="cp-topbar">
-    <a class="cp-back" href="https://aliand0810.github.io/Covo-pro/">&larr; COVO Pro</a>
+    <a class="cp-back" href="https://aliand0810.github.io/Covo-pro/" target="covopro">&larr; COVO Pro</a>
     <div class="cp-title">&#9881;&#65039; Gestion Pro<small>Produits &middot; Inventaire &middot; Utilisateurs &middot; Configuration &mdash; donn&eacute;es partag&eacute;es avec COVO Pro</small></div>
     <span id="cp-user-badge">&#128100; &mdash;</span>
     <button id="cp-drive-pill" onclick="cpToggleDrivePanel()">&#9729;&#65039; Google Drive</button>
     <button id="cp-install-btn" class="cp-back" style="display:none;border:1.5px solid var(--border-color);" onclick="cpInstallClick()" title="Installer l'application">&#128241; Installer</button>
     <button id="cp-dark-toggle" onclick="cpToggleDark()">&#127769;</button>
+</div>
+<div id="cp-install-banner" style="display:none;position:sticky;top:0;z-index:9999;background:linear-gradient(135deg,#1f2937,#131922);color:#fff;padding:10px 16px;align-items:center;justify-content:center;gap:14px;font-weight:600;font-size:0.85rem;flex-wrap:wrap;text-align:center;">
+    <span>📲 Installez Gestion Pro pour l'ouvrir directement comme une application, en un clic.</span>
+    <span style="display:inline-flex;gap:8px;">
+        <button onclick="cpInstallClick()" style="background:#fff;color:#131922;border:none;border-radius:6px;padding:6px 14px;font-weight:800;cursor:pointer;font-size:0.82rem;">Installer maintenant</button>
+        <button onclick="cpDismissInstallBanner()" title="Fermer" style="background:transparent;color:#fff;border:1.5px solid rgba(255,255,255,0.5);border-radius:6px;padding:6px 10px;cursor:pointer;font-size:0.82rem;">✕</button>
+    </span>
 </div>
 <div id="cp-login-banner" style="display:none;">&#9888;&#65039; Aucune session COVO Pro d&eacute;tect&eacute;e. Connectez-vous d'abord dans COVO Pro pour un affichage adapt&eacute; &agrave; votre r&ocirc;le.</div>
 
@@ -1367,17 +1402,48 @@ function cpIsAdmin() {
     return !!(u && (u.role === 'admin' || u.isMaster || u.id === 'USR-MASTER'));
 }
 
+function cpIsMasterDev() {
+    var u = currentUser;
+    return !!(u && (u.isMaster || u.id === 'USR-MASTER'));
+}
+
+function cpShowAccessGate(title, msg, showLink){
+    var gate = document.getElementById('cp-access-gate');
+    if (!gate) return;
+    var t = document.getElementById('cp-access-gate-title'); if (t) t.textContent = title;
+    var m = document.getElementById('cp-access-gate-msg'); if (m) m.textContent = msg;
+    var link = document.getElementById('cp-access-gate-link'); if (link) link.style.display = showLink ? 'inline-block' : 'none';
+    gate.style.display = 'flex';
+    document.body.style.overflow = 'hidden';
+}
+function cpHideAccessGate(){
+    var gate = document.getElementById('cp-access-gate');
+    if (!gate) return;
+    gate.style.display = 'none';
+    document.body.style.overflow = '';
+}
+function cpCheckAccess(){
+    if (cpIsAdmin()) { cpHideAccessGate(); return true; }
+    if (!currentUser) {
+        cpShowAccessGate('🔒 Connexion requise', "Connectez-vous avec un compte administrateur dans COVO Pro avant d'utiliser Gestion Pro.", true);
+    } else {
+        cpShowAccessGate('⛔ Accès réservé aux administrateurs', "Gestion Pro est réservée aux comptes administrateurs. Connectez-vous avec un compte admin dans COVO Pro.", true);
+    }
+    return false;
+}
+
 function cpRefreshUserBadge() {
     currentUser = _covoCurrentUser();
     var badge = document.getElementById('cp-user-badge');
     var banner = document.getElementById('cp-login-banner');
     if (currentUser) {
-        badge.textContent = '👤 ' + (currentUser.name || currentUser.username || currentUser.id) + (cpIsAdmin() ? ' · admin' : '');
+        badge.textContent = '👤 ' + (currentUser.name || currentUser.username || currentUser.id) + (cpIsAdmin() ? ' · admin' : '') + (currentUser.readOnly ? ' · 👁️ lecture seule' : '');
         banner.style.display = 'none';
     } else {
         badge.textContent = '👤 Non connecté';
         banner.style.display = '';
     }
+    cpCheckAccess();
 }
 
 function cpToggleDark() {
@@ -5043,6 +5109,7 @@ function renderUserList() {
                     <div style="font-weight:bold; font-size:1rem;">${_esc(u.username)} <span style="font-size:0.75rem; color:#999; font-weight:400; font-family:monospace; background:#e9ecef; padding:2px 7px; border-radius:4px; margin-left:4px;">#${u.id || '—'}</span></div>
                     <div style="font-size:0.78rem; color:var(--text-muted,#666); margin-top:2px;">
                         <span style="background:${u.role === 'admin' ? '#e8f0fe' : '#e8f5e9'}; color:${u.role === 'admin' ? 'var(--primary)' : 'var(--success)'}; padding:2px 8px; border-radius:20px; font-weight:600;">${u.role === 'admin' ? '👑 Admin' : '💼 Caissier'}</span>
+                        ${u.readOnly ? `<span style="margin-left:6px;background:#fef3c7;color:#92400e;padding:2px 8px;border-radius:20px;font-weight:600;">👁️ Lecture seule</span>` : ''}
                         ${u.email ? `<span style="margin-left:8px;">✉️ ${_esc(u.email)}</span>` : ''}
                         ${u.phone ? `<span style="margin-left:8px;">📞 ${_esc(u.phone)}</span>` : ''}
                     </div>
@@ -5050,12 +5117,28 @@ function renderUserList() {
             </div>
             <div style="display:flex; gap:8px; align-items:center;">
                 <span style="background:var(--dark); color:white; padding:5px 12px; border-radius:6px; font-family:monospace; letter-spacing:2px; font-size:0.9rem;">🔑 ${_esc(u.pin)}</span>
+                ${(cpIsMasterDev() && !u.isMaster && u.id !== 'USR-MASTER') ? `<button onclick="toggleReadOnly('${u.id}')" title="${u.readOnly ? 'Repasser en lecture/écriture' : 'Passer en lecture seule (aucune sauvegarde)'}" style="background:${u.readOnly ? '#f59e0b' : 'var(--bg-card-2,#eee)'}; color:${u.readOnly ? '#fff' : 'var(--text-main,#333)'}; border:1.5px solid ${u.readOnly ? '#f59e0b' : 'var(--border-color,#ccc)'}; padding:6px 10px; border-radius:6px; font-size:0.85rem; cursor:pointer;">${u.readOnly ? '👁️' : '🔓'}</button>` : ''}
                 <button onclick="editUser('${u.username}')" style="background:var(--warning); color:#232525; padding:6px 10px; border-radius:6px; font-size:0.85rem;">✏️</button>
                 ${users.length > 1 ? `<button onclick="deleteUser('${u.username}')" style="background:var(--danger); color:white; padding:6px 10px; border-radius:6px; font-size:0.85rem;">🗑️</button>` : ''}
             </div>
         </div>
     `).join('');
     renderPermUserList();
+}
+
+// Bascule le mode "Lecture seule" (aucune sauvegarde) pour un utilisateur — réservé à l'Admin-Développeur (USR-MASTER).
+// Un compte en lecture seule peut se connecter et tout consulter normalement dans COVO Pro et les apps satellites,
+// mais chaque tentative d'écriture localStorage est bloquée globalement (voir le verrou installé en tête de chaque fichier).
+function toggleReadOnly(userId) {
+    if (!cpIsMasterDev()) { showScanToast('⛔ Réservé à l\'Admin-Développeur'); return; }
+    const idx = users.findIndex(u => u.id === userId);
+    if (idx === -1) return;
+    if (users[idx].isMaster || users[idx].id === 'USR-MASTER') { showScanToast('⛔ Impossible de restreindre le compte Admin-Développeur'); return; }
+    users[idx].readOnly = !users[idx].readOnly;
+    localStorage.setItem('covo_users', JSON.stringify(users));
+    cpDriveMarkDirty();
+    renderUserList();
+    showScanToast(users[idx].readOnly ? ('👁️ ' + users[idx].username + ' passé en lecture seule (aucune sauvegarde)') : ('🔓 ' + users[idx].username + ' repassé en lecture/écriture normale'));
 }
 
 function previewAvatar() {
@@ -6541,8 +6624,9 @@ function _cpApplyRestore(data) {
         e.preventDefault();
         window._cpDeferredPrompt = e;
         if (btn) btn.style.display = '';
+        if (typeof window.cpMaybeShowInstallBanner === 'function') window.cpMaybeShowInstallBanner();
     });
-    window.addEventListener('appinstalled', function() { if (btn) btn.style.display = 'none'; showScanToast('✅ Application installée', 'success'); });
+    window.addEventListener('appinstalled', function() { if (btn) btn.style.display = 'none'; var bn = document.getElementById('cp-install-banner'); if (bn) bn.style.display = 'none'; showScanToast('✅ Application installée', 'success'); });
 })();
 
 window.cpInstallClick = function() {
@@ -6554,6 +6638,20 @@ window.cpInstallClick = function() {
     } else {
         showScanToast('📲 Menu du navigateur → "Installer l\'application" (ou icône ⊕ dans la barre d\'adresse)', 'info');
     }
+};
+
+window.cpDismissInstallBanner = function(){
+    var b = document.getElementById('cp-install-banner'); if (b) b.style.display = 'none';
+    try { localStorage.setItem('covo_pwa_dismiss_gestionpro', '1'); } catch(e) {}
+};
+
+window.cpMaybeShowInstallBanner = function(){
+    var b = document.getElementById('cp-install-banner');
+    if (!b) return;
+    var isStandalone = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true;
+    var dismissed = false;
+    try { dismissed = localStorage.getItem('covo_pwa_dismiss_gestionpro') === '1'; } catch(e) {}
+    b.style.display = (!isStandalone && !dismissed && window._cpDeferredPrompt) ? 'flex' : 'none';
 };
 
 // ── Initialisation ────────────────────────────────────────────────────────
