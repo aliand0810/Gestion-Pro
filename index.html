@@ -6560,6 +6560,13 @@ async function _cpEnsureFolder() {
 }
 
 window.cpDriveBackupNow = async function(silent) {
+    // Lecture seule (readOnly) : aucune sauvegarde Drive autorisée, jamais — même via le bouton manuel
+    // "Sauvegarder maintenant" (silent falsy), contrairement au garde-fou isMaster juste en dessous.
+    var _cpCuRO = (typeof _covoCurrentUser === 'function') ? _covoCurrentUser() : null;
+    if (_cpCuRO && _cpCuRO.readOnly === true) {
+        if (!silent && typeof showScanToast === 'function') showScanToast('👁️ Mode consultation seule — sauvegarde désactivée par l\'Admin-Développeur', 'info');
+        return;
+    }
     // Admin-Développeur (isMaster) : sauvegarde Drive automatique désactivée — uniquement via le bouton manuel
     // "Sauvegarder maintenant" (appelé sans argument, donc silent est falsy et ce garde-fou ne s'applique pas).
     if (silent) {
