@@ -5136,7 +5136,9 @@ function toggleReadOnly(userId) {
     if (users[idx].isMaster || users[idx].id === 'USR-MASTER') { showScanToast('⛔ Impossible de restreindre le compte Admin-Développeur'); return; }
     users[idx].readOnly = !users[idx].readOnly;
     localStorage.setItem('covo_users', JSON.stringify(users));
-    cpDriveMarkDirty();
+    // Sauvegarde immédiate et ciblée (paramètres utilisateurs uniquement, ventes non touchées) —
+    // ne dépend pas du bouton "Sauvegarder maintenant" et n'est pas bloquée pour l'Admin-Développeur.
+    if (typeof cpDriveSaveUsersNow === 'function') cpDriveSaveUsersNow();
     renderUserList();
     showScanToast(users[idx].readOnly ? ('👁️ ' + users[idx].username + ' passé en lecture seule (aucune sauvegarde)') : ('🔓 ' + users[idx].username + ' repassé en lecture/écriture normale'));
 }
@@ -6543,6 +6545,49 @@ window.cpDriveBackupNow = async function(silent) {
     } catch(e) {
         console.error(e);
         if (!silent) showScanToast('❌ Échec de la sauvegarde Drive', 'error');
+    }
+};
+
+// Sauvegarde IMMÉDIATE et CIBLÉE des paramètres utilisateurs (ex : bascule lecture seule) — jamais
+// bloquée par le garde-fou "Admin-Développeur = pas d'auto-save", et ne touche jamais aux ventes :
+// on repart de la dernière sauvegarde Drive existante (produits, ventes, etc. inchangés) et on y
+// remplace uniquement la liste "users", avant de la réécrire. Évite qu'un changement de permission
+// reste non sauvegardé (silencieusement ignoré par cpDriveBackupNow(true) pour l'Admin-Développeur),
+// tout en évitant de réécraser les ventes avec une copie locale potentiellement en retard côté master.
+window.cpDriveSaveUsersNow = async function() {
+    if (!_cpConnected) return;
+    try {
+        var folderId = await _cpEnsureFolder();
+        if (!folderId) return;
+        var q = encodeURIComponent("'"+folderId+"' in parents and trashed=false and name contains 'covo_backup'");
+        var r = await _cpFetch('https://www.googleapis.com/drive/v3/files?q='+q+'&orderBy=modifiedTime desc&pageSize=1&fields=files(id,name)');
+        var j = await r.json();
+        var payload = null;
+        if (j.files && j.files.length) {
+            try {
+                var fr = await _cpFetch('https://www.googleapis.com/drive/v3/files/'+j.files[0].id+'?alt=media');
+                payload = JSON.parse(await fr.text());
+            } catch(e) { payload = null; }
+        }
+        if (!payload) payload = _cpBuildFullBackupPayload();
+        // Seule la partie "paramètres utilisateurs" est mise à jour — le reste (ventes, produits…)
+        // provient de la dernière sauvegarde Drive telle quelle.
+        payload.users = JSON.parse(localStorage.getItem('covo_users') || '[]');
+        payload._version = 20;
+        payload._savedAt = new Date().toISOString();
+        var now = new Date();
+        var date = now.toISOString().split('T')[0];
+        var time = now.toTimeString().split(' ')[0].replace(/:/g, '-');
+        var filename = 'covo_backup_' + date + '_' + time + '.json';
+        var content = JSON.stringify(payload, null, 2);
+        var meta = { name: filename, parents: [folderId] };
+        var boundary = '-------cpU' + Date.now();
+        var body = '--'+boundary+'\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n'+JSON.stringify(meta)+'\r\n--'+boundary+'\r\nContent-Type: application/json\r\n\r\n'+content+'\r\n--'+boundary+'--';
+        await _cpFetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart', { method:'POST', headers:{'Content-Type':'multipart/related; boundary='+boundary}, body: body });
+        cpSetDriveStatus(true, 'Paramètres sauvegardés : ' + now.toLocaleTimeString('fr-FR'));
+    } catch(e) {
+        console.error('cpDriveSaveUsersNow error:', e);
+        if (typeof showScanToast === 'function') showScanToast('⚠️ Sauvegarde des paramètres utilisateur : échec Drive (conservé en local)', 'info');
     }
 };
 
