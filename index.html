@@ -5018,7 +5018,7 @@ function lookupProductByBarcode() {
 // fonction saveEchCats() écrase aussi la clé covo_categories (catégories
 // PRODUITS utilisées par la caisse) avec la liste des catégories
 // d'échéances — un bug de données déjà identifié lors de la construction
-// d'Investissement Pro. Cette écrasement n'est PAS reproduit ici.
+// d'Approvisionnement PRO. Cette écrasement n'est PAS reproduit ici.
 function saveEchCats(cats) {
     localStorage.setItem(ECH_CATS_KEY, JSON.stringify(cats));
     refreshEchCategorySelects();
