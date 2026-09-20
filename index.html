@@ -1150,6 +1150,15 @@
     </div>
 
     <div class="wh-section">
+        <div class="wh-section-title">🖥️ Plein écran automatique</div>
+        <div class="wh-section-sub">Passe l'application en plein écran automatiquement dès qu'un utilisateur se connecte (peut aussi être activé/désactivé manuellement avec le bouton 🖥️ Plein écran ou la touche F11).</div>
+        <label style="display:flex; align-items:center; gap:12px; cursor:pointer; background:var(--bg-card-2,#f3e8ff); border-radius:8px; padding:11px 14px; border:2px solid #9b59b6;">
+            <input type="checkbox" id="settings-auto-fullscreen" style="width:20px; height:20px; cursor:pointer; accent-color:#9b59b6;" onchange="saveAutoFullscreenSetting(this.checked)">
+            <span style="flex:1; color:var(--text-main);">🖥️ Activer le plein écran automatique à la connexion</span>
+        </label>
+    </div>
+
+    <div class="wh-section">
         <div class="wh-section-title">📊 Stats ventes sur la fiche produit</div>
         <div class="wh-section-sub">Par défaut, seuls les admins voient le nombre d'articles vendus et le CA sur la fiche produit.</div>
         <label style="display:flex; align-items:center; gap:12px; cursor:pointer; background:var(--bg-card-2,#fff3e0); border-radius:8px; padding:11px 14px; border:2px solid #e67e22;">
@@ -5430,6 +5439,8 @@ function gstConfigInit() {
     if (timeoutInput) timeoutInput.value = appSettings.sessionTimeout || 5;
     const statsCb = document.getElementById('settings-product-stats-cashier');
     if (statsCb) statsCb.checked = !!appSettings.productStatsCashier;
+    const fsCb = document.getElementById('settings-auto-fullscreen');
+    if (fsCb) fsCb.checked = appSettings.autoFullscreenOnLogin === true;
     renderPromoManager();
 }
 
@@ -5465,6 +5476,13 @@ function saveProductStatsSetting(val) {
     appSettings.productStatsCashier = !!val;
     localStorage.setItem('covo_settings', JSON.stringify(appSettings));
     cpDriveMarkDirty();
+}
+
+function saveAutoFullscreenSetting(val) {
+    appSettings.autoFullscreenOnLogin = !!val;
+    localStorage.setItem('covo_settings', JSON.stringify(appSettings));
+    cpDriveMarkDirty();
+    showScanToast(val ? '🖥️ Plein écran automatique activé à la connexion' : '🪟 Plein écran automatique désactivé', 'info');
 }
 
 function renderPromoManager() {
