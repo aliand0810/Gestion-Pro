@@ -7144,14 +7144,26 @@ function _devisRenderCatalogPicker() {
         return;
     }
     wrap.innerHTML = list.map(function(p){
-        const price = (p.unitType === 'kg' && p.pricePerKg) ? parseFloat(p.pricePerKg) : (parseFloat(p.price) || 0);
-        const unitLbl = p.unitType === 'kg' ? ' €/kg' : ' €';
+        const isKg = p.unitType === 'kg';
+        const price = (isKg && p.pricePerKg) ? parseFloat(p.pricePerKg) : (parseFloat(p.price) || 0);
+        const unitLbl = isKg ? ' €/kg' : ' €';
+        // Même convention de couleur que le tableau du catalogue (onglet Produits) : rouge = rupture,
+        // orange = stock bas, vert = stock correct — purement informatif, n'empêche jamais l'ajout.
+        const stockVal = parseFloat(p.stock) || 0;
+        const isOut = stockVal <= 0;
+        const isLow = !isOut && stockVal <= (isKg ? 0.5 : 5);
+        const stockColor = isOut ? '#e74c3c' : (isLow ? '#e67e22' : '#27ae60');
+        const stockLabel = isKg ? (stockVal.toFixed(3) + ' kg') : (stockVal + ' u.');
+        const stockIcon = isOut ? '⛔' : (isLow ? '⚠️' : '📦');
         return '<div onclick="_devisAddCatalogItem(' + p.id + ')" style="display:flex;align-items:center;justify-content:space-between;gap:10px;padding:9px 12px;background:var(--bg-body,#f4f7f6);border-radius:9px;cursor:pointer;border:1.5px solid var(--border-color,#eee);">'
             + '<div style="flex:1;min-width:0;">'
             +   '<div style="font-weight:700;font-size:0.85rem;color:var(--text-main);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' + (p.name||'').replace(/</g,'&lt;') + '</div>'
             +   (p.category ? ('<div style="font-size:0.7rem;color:var(--text-muted,#888);">' + p.category.replace(/</g,'&lt;') + '</div>') : '')
             + '</div>'
-            + '<div style="font-weight:800;color:#2c6fad;font-size:0.85rem;white-space:nowrap;">' + price.toFixed(2) + unitLbl + '</div>'
+            + '<div style="text-align:right;white-space:nowrap;">'
+            +   '<div style="font-weight:800;color:#2c6fad;font-size:0.85rem;">' + price.toFixed(2) + unitLbl + '</div>'
+            +   '<div style="font-size:0.7rem;font-weight:700;color:' + stockColor + ';">' + stockIcon + ' ' + stockLabel + '</div>'
+            + '</div>'
             + '</div>';
     }).join('');
 }
