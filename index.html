@@ -184,6 +184,11 @@
     .tab-visibility-info { display:flex; flex-direction:column; }
     .tab-visibility-info strong { font-size:0.9rem; }
     .tab-visibility-info span { font-size:0.75rem; color:var(--gray,#7f8c8d); }
+    .devis-row { transition: box-shadow 0.15s, border-color 0.15s, transform 0.1s; }
+    .devis-row:hover { border-color:#2c6fad !important; box-shadow:0 4px 14px rgba(44,111,173,0.16); transform:translateY(-1px); }
+    .devis-row:active { transform:translateY(0); }
+    .devis-icon-btn { background:none; border:none; cursor:pointer; font-size:1.02rem; padding:4px 6px; border-radius:6px; transition:background 0.15s; }
+    .devis-icon-btn:hover { background:var(--bg-card-3,#f0f3f7); }
 </style>
 </head>
 <body>
@@ -1295,33 +1300,34 @@
 <!-- ===== ONGLET DEVIS ==================================================== -->
 <div class="gst-panel" id="gst-devis">
 <div style="padding:14px 18px;">
-    <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-bottom:14px;">
-        <div>
-            <div style="font-weight:800;font-size:1rem;color:var(--text-main);">🧾 Devis</div>
-            <div style="font-size:0.8rem;color:var(--text-muted,#888);">Créez des devis, modifiez-les, générez-les en PDF et imprimez-les.</div>
+    <div style="display:flex;align-items:center;justify-content:space-between;gap:14px;flex-wrap:wrap;margin-bottom:18px;padding-bottom:14px;border-bottom:1.5px solid var(--border-color,#eee);">
+        <div style="display:flex;align-items:center;gap:12px;">
+            <div style="width:44px;height:44px;border-radius:12px;background:linear-gradient(135deg,#2c6fad,#1b456b);display:flex;align-items:center;justify-content:center;font-size:1.3rem;flex-shrink:0;box-shadow:0 4px 12px rgba(44,111,173,0.3);">🧾</div>
+            <div>
+                <div style="font-weight:900;font-size:1.08rem;color:var(--text-main);letter-spacing:-0.2px;">Devis</div>
+                <div style="font-size:0.78rem;color:var(--text-muted,#888);">Créez, suivez et imprimez vos devis clients</div>
+            </div>
         </div>
-        <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
-            <input id="devis-search" type="text" placeholder="🔍 Client, numéro..." oninput="_devisRenderList()"
-                style="padding:8px 10px;border:1.5px solid var(--border-color,#ddd);border-radius:8px;font-size:0.85rem;background:var(--input-bg,#fff);color:var(--text-main);min-width:180px;">
-            <button onclick="_devisOpenEditor(null)" style="padding:9px 18px;background:linear-gradient(135deg,#2c6fad,#1b456b);color:white;border:none;border-radius:9px;cursor:pointer;font-weight:800;font-size:0.85rem;white-space:nowrap;">➕ Nouveau devis</button>
-        </div>
+        <button onclick="_devisOpenEditor(null)" style="padding:11px 20px;background:linear-gradient(135deg,#2c6fad,#1b456b);color:white;border:none;border-radius:10px;cursor:pointer;font-weight:800;font-size:0.86rem;white-space:nowrap;box-shadow:0 3px 10px rgba(44,111,173,0.35);">➕ Nouveau devis</button>
     </div>
-    <div id="devis-stats-row" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px;margin-bottom:16px;"></div>
-    <div id="devis-list-wrap" style="overflow-x:auto;">
-        <table style="width:100%;border-collapse:collapse;font-size:0.85rem;">
-            <thead>
-                <tr style="background:var(--bg-card-3,#f4f6f9);text-align:left;">
-                    <th style="padding:9px 10px;">N°</th>
-                    <th style="padding:9px 10px;">Client</th>
-                    <th style="padding:9px 10px;">Date</th>
-                    <th style="padding:9px 10px;">Validité</th>
-                    <th style="padding:9px 10px;text-align:right;">Total TTC</th>
-                    <th style="padding:9px 10px;">Statut</th>
-                    <th style="padding:9px 10px;text-align:center;">Actions</th>
-                </tr>
-            </thead>
-            <tbody id="devis-list-body"></tbody>
-        </table>
+    <div id="devis-stats-row" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-bottom:18px;"></div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:12px;">
+        <div style="position:relative;flex:1;min-width:200px;">
+            <input id="devis-search" type="text" placeholder="🔍 Rechercher un client, un numéro..." oninput="_devisRenderList()"
+                style="width:100%;padding:9px 12px;border:1.5px solid var(--border-color,#ddd);border-radius:9px;font-size:0.85rem;background:var(--input-bg,#fff);color:var(--text-main);">
+        </div>
+        <select id="devis-filter-statut" onchange="_devisRenderList()" style="padding:9px 12px;border:1.5px solid var(--border-color,#ddd);border-radius:9px;font-size:0.83rem;background:var(--input-bg,#fff);color:var(--text-main);cursor:pointer;">
+            <option value="">Tous les statuts</option>
+            <option value="brouillon">📝 Brouillon</option>
+            <option value="envoye">📤 Envoyé</option>
+            <option value="accepte">✅ Accepté</option>
+            <option value="refuse">❌ Refusé</option>
+            <option value="expire">⌛ Expiré</option>
+        </select>
+    </div>
+    <div style="font-size:0.72rem;color:var(--text-muted,#888);margin-bottom:8px;">💡 Cliquez sur un devis pour l'aperçu complet — modification, PDF et suppression en un clic depuis là.</div>
+    <div id="devis-list-wrap">
+        <div id="devis-list-body" style="display:flex;flex-direction:column;gap:8px;"></div>
         <div id="devis-empty" style="display:none;text-align:center;padding:40px 20px;color:var(--text-muted,#888);">
             <div style="font-size:2.4rem;margin-bottom:8px;">🧾</div>
             <div style="font-weight:700;">Aucun devis pour le moment</div>
@@ -1450,6 +1456,25 @@
     <div id="devis-catalog-picker-list" style="flex:1;overflow-y:auto;padding:10px 14px;display:flex;flex-direction:column;gap:6px;"></div>
     <div style="padding:12px 16px;border-top:1.5px solid var(--border-color,#eee);background:var(--bg-body,#f4f7f6);text-align:right;">
       <button onclick="document.getElementById('devis-catalog-modal').style.display='none'" style="padding:8px 16px;background:var(--bg-card,#fff);color:var(--text-main);border:1.5px solid var(--border-color,#ddd);border-radius:8px;cursor:pointer;font-size:0.82rem;font-weight:700;">✕ Terminer</button>
+    </div>
+  </div>
+</div>
+
+<div role="dialog" aria-modal="true" id="devis-preview-modal" style="display:none;position:fixed;inset:0;z-index:99850;background:rgba(0,0,0,0.68);backdrop-filter:blur(6px);align-items:flex-start;justify-content:center;overflow-y:auto;padding:24px 8px;">
+  <div style="background:var(--bg-card,#fff);border-radius:16px;width:96%;max-width:620px;display:flex;flex-direction:column;overflow:hidden;box-shadow:0 24px 60px rgba(0,0,0,0.4);margin-bottom:24px;">
+    <div style="background:linear-gradient(135deg,#2c6fad,#1b456b);padding:16px 20px;display:flex;align-items:center;justify-content:space-between;flex-shrink:0;">
+      <div>
+        <div style="color:white;font-weight:900;font-size:1.05rem;" id="devis-preview-numero">🧾 DEV-2026-0001</div>
+        <div style="color:rgba(255,255,255,0.8);font-size:0.75rem;margin-top:2px;" id="devis-preview-substatus"></div>
+      </div>
+      <button onclick="document.getElementById('devis-preview-modal').style.display='none'" style="background:rgba(255,255,255,0.2);border:none;color:white;width:32px;height:32px;border-radius:50%;cursor:pointer;font-size:1rem;flex-shrink:0;">✕</button>
+    </div>
+    <div id="devis-preview-body" style="overflow-y:auto;padding:20px;"></div>
+    <div style="padding:14px 20px;border-top:1.5px solid var(--border-color,#eee);display:flex;gap:8px;flex-wrap:wrap;background:var(--bg-body,#f4f7f6);flex-shrink:0;">
+      <button id="devis-preview-btn-del" onclick="" style="padding:9px 14px;background:none;color:#e74c3c;border:1.5px solid #e74c3c;border-radius:9px;cursor:pointer;font-size:0.82rem;font-weight:700;">🗑️ Supprimer</button>
+      <button id="devis-preview-btn-dup" onclick="" style="padding:9px 14px;background:var(--bg-card,#fff);color:var(--text-main);border:1.5px solid var(--border-color,#ddd);border-radius:9px;cursor:pointer;font-size:0.82rem;font-weight:700;">📋 Dupliquer</button>
+      <button id="devis-preview-btn-pdf" onclick="" style="padding:9px 16px;background:linear-gradient(135deg,#2c6fad,#1b456b);color:white;border:none;border-radius:9px;cursor:pointer;font-size:0.83rem;font-weight:800;">🖨️ PDF</button>
+      <button id="devis-preview-btn-edit" onclick="" style="padding:9px 18px;background:#e38737;color:white;border:none;border-radius:9px;cursor:pointer;font-size:0.83rem;font-weight:800;margin-left:auto;">✏️ Modifier</button>
     </div>
   </div>
 </div>
@@ -7002,14 +7027,24 @@ function _devisStatutInfo(statut) {
     }
 }
 function _devisStatCard(icon, val, label, color) {
-    return '<div style="background:var(--bg-card,#fff);border:1.5px solid var(--border-color,#eee);border-radius:10px;padding:10px 12px;text-align:center;">'
-        + '<div style="font-size:1.3rem;">' + icon + '</div>'
-        + '<div style="font-weight:900;font-size:1.05rem;color:' + color + ';">' + val + '</div>'
-        + '<div style="font-size:0.7rem;color:var(--text-muted,#888);">' + label + '</div>'
+    return '<div style="background:var(--bg-card,#fff);border:1.5px solid var(--border-color,#eee);border-radius:12px;padding:12px 14px;display:flex;align-items:center;gap:12px;">'
+        + '<div style="width:38px;height:38px;border-radius:10px;background:' + color + '1a;display:flex;align-items:center;justify-content:center;font-size:1.15rem;flex-shrink:0;">' + icon + '</div>'
+        + '<div style="min-width:0;">'
+        +   '<div style="font-weight:900;font-size:1.05rem;color:' + color + ';line-height:1.15;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' + val + '</div>'
+        +   '<div style="font-size:0.7rem;color:var(--text-muted,#888);white-space:nowrap;">' + label + '</div>'
+        + '</div>'
         + '</div>';
 }
 
 function _devisInit() { _devisRenderList(); }
+
+// Statut affectif effectif d'un devis : "expire" prime sur brouillon/envoyé si la date de
+// validité est dépassée (jamais sur un devis déjà accepté ou refusé, qui reste tel quel).
+function _devisEffectiveStatut(d, today) {
+    const expDate = _devisExpiryDate(d);
+    const expired = expDate && expDate < today && d.statut !== 'accepte' && d.statut !== 'refuse';
+    return expired ? 'expire' : (d.statut || 'brouillon');
+}
 
 function _devisRenderList() {
     const body = document.getElementById('devis-list-body');
@@ -7018,13 +7053,19 @@ function _devisRenderList() {
     if (!body) return;
     const searchEl = document.getElementById('devis-search');
     const q = (searchEl ? searchEl.value : '').trim().toLowerCase();
+    const filterEl = document.getElementById('devis-filter-statut');
+    const statutFilter = filterEl ? filterEl.value : '';
     const totalAll = _devisGetAll();
+    const today = new Date(); today.setHours(0,0,0,0);
     let list = totalAll.slice().sort(function(a,b){ return (b.createdAt||'').localeCompare(a.createdAt||''); });
     if (q) {
         list = list.filter(function(d){
             return (d.numero||'').toLowerCase().indexOf(q) !== -1 ||
                    (((d.client&&d.client.nom)||'').toLowerCase().indexOf(q) !== -1);
         });
+    }
+    if (statutFilter) {
+        list = list.filter(function(d){ return _devisEffectiveStatut(d, today) === statutFilter; });
     }
     if (statsRow) {
         const accepted = totalAll.filter(function(d){ return d.statut === 'accepte'; });
@@ -7038,30 +7079,108 @@ function _devisRenderList() {
     }
     if (!list.length) {
         body.innerHTML = '';
-        if (empty) empty.style.display = 'block';
+        if (empty) {
+            empty.style.display = 'block';
+            empty.querySelector('div:last-child').textContent = (q || statutFilter)
+                ? 'Aucun devis ne correspond à ce filtre.'
+                : "Cliquez sur « ➕ Nouveau devis » pour en créer un.";
+        }
         return;
     }
     if (empty) empty.style.display = 'none';
-    const today = new Date(); today.setHours(0,0,0,0);
     body.innerHTML = list.map(function(d) {
+        const statutInfo = _devisStatutInfo(_devisEffectiveStatut(d, today));
         const expDate = _devisExpiryDate(d);
-        const expired = expDate && expDate < today && d.statut !== 'accepte' && d.statut !== 'refuse';
-        const statutInfo = _devisStatutInfo(expired ? 'expire' : d.statut);
-        return '<tr style="border-bottom:1px solid var(--border-color,#eee);">'
-            + '<td style="padding:8px 10px;font-weight:700;color:var(--text-main);">' + (d.numero||'').replace(/</g,'&lt;') + '</td>'
-            + '<td style="padding:8px 10px;color:var(--text-main);">' + (((d.client&&d.client.nom)||'—').replace(/</g,'&lt;')) + '</td>'
-            + '<td style="padding:8px 10px;color:var(--text-muted,#888);">' + _devisFmtDateFR(d.dateEmission) + '</td>'
-            + '<td style="padding:8px 10px;color:var(--text-muted,#888);">' + (expDate ? _devisFmtDateFR(expDate.toISOString().slice(0,10)) : '—') + '</td>'
-            + '<td style="padding:8px 10px;text-align:right;font-weight:800;color:#e38737;">' + _devisFmtEUR(d.totalTTC) + '</td>'
-            + '<td style="padding:8px 10px;"><span style="background:' + statutInfo.bg + ';color:' + statutInfo.fg + ';padding:3px 9px;border-radius:12px;font-size:0.72rem;font-weight:700;white-space:nowrap;">' + statutInfo.label + '</span></td>'
-            + '<td style="padding:8px 10px;text-align:center;white-space:nowrap;">'
-            +   '<button onclick="_devisOpenEditor(\'' + d.id + '\')" title="Modifier" style="background:none;border:none;cursor:pointer;font-size:1rem;padding:3px;">✏️</button>'
-            +   '<button onclick="_devisGeneratePDF(\'' + d.id + '\')" title="PDF / Imprimer" style="background:none;border:none;cursor:pointer;font-size:1rem;padding:3px;">🖨️</button>'
-            +   '<button onclick="_devisDuplicate(\'' + d.id + '\')" title="Dupliquer" style="background:none;border:none;cursor:pointer;font-size:1rem;padding:3px;">📋</button>'
-            +   '<button onclick="_devisDelete(\'' + d.id + '\')" title="Supprimer" style="background:none;border:none;cursor:pointer;font-size:1rem;padding:3px;">🗑️</button>'
-            + '</td></tr>';
+        const clientNom = ((d.client&&d.client.nom)||'—').replace(/</g,'&lt;');
+        return '<div class="devis-row" onclick="_devisOpenPreview(\'' + d.id + '\')" '
+            + 'style="display:flex;align-items:stretch;gap:12px;padding:0;background:var(--bg-card,#fff);border:1.5px solid var(--border-color,#eee);border-radius:12px;cursor:pointer;overflow:hidden;">'
+            + '<div style="width:5px;flex-shrink:0;background:' + statutInfo.fg + ';"></div>'
+            + '<div style="flex:1;min-width:0;display:flex;align-items:center;gap:14px;padding:11px 14px 11px 4px;flex-wrap:wrap;">'
+            +   '<div style="flex:1;min-width:160px;">'
+            +     '<div style="display:flex;align-items:baseline;gap:8px;flex-wrap:wrap;">'
+            +       '<span style="font-weight:800;color:#2c6fad;font-size:0.82rem;">' + (d.numero||'').replace(/</g,'&lt;') + '</span>'
+            +       '<span style="font-weight:700;color:var(--text-main);font-size:0.92rem;">' + clientNom + '</span>'
+            +     '</div>'
+            +     '<div style="font-size:0.73rem;color:var(--text-muted,#888);margin-top:2px;">'
+            +       'Émis le ' + _devisFmtDateFR(d.dateEmission) + (expDate ? (' · Valable jusqu\'au ' + _devisFmtDateFR(expDate.toISOString().slice(0,10))) : '')
+            +     '</div>'
+            +   '</div>'
+            +   '<div style="text-align:right;white-space:nowrap;">'
+            +     '<div style="font-weight:900;font-size:0.98rem;color:#e38737;">' + _devisFmtEUR(d.totalTTC) + '</div>'
+            +     '<span style="background:' + statutInfo.bg + ';color:' + statutInfo.fg + ';padding:2px 9px;border-radius:12px;font-size:0.68rem;font-weight:700;white-space:nowrap;display:inline-block;margin-top:2px;">' + statutInfo.label + '</span>'
+            +   '</div>'
+            +   '<div onclick="event.stopPropagation()" style="display:flex;gap:2px;border-left:1.5px solid var(--border-color,#eee);padding-left:10px;flex-shrink:0;">'
+            +     '<button class="devis-icon-btn" onclick="_devisGeneratePDF(\'' + d.id + '\')" title="PDF / Imprimer">🖨️</button>'
+            +     '<button class="devis-icon-btn" onclick="_devisDuplicate(\'' + d.id + '\')" title="Dupliquer">📋</button>'
+            +     '<button class="devis-icon-btn" onclick="_devisDelete(\'' + d.id + '\')" title="Supprimer">🗑️</button>'
+            +   '</div>'
+            + '</div>'
+            + '</div>';
     }).join('');
 }
+
+// ── Aperçu (clic sur une ligne de la liste) ─────────────────────────────────
+// Vue complète et professionnelle du devis, en lecture seule, avec un accès direct à la
+// modification, au PDF, à la duplication ou à la suppression sans repasser par la liste.
+window._devisOpenPreview = function(id) {
+    const d = _devisGetAll().find(function(x){ return x.id === id; });
+    if (!d) { showScanToast('Devis introuvable'); return; }
+    const today = new Date(); today.setHours(0,0,0,0);
+    const statutInfo = _devisEffectiveStatut ? _devisStatutInfo(_devisEffectiveStatut(d, today)) : _devisStatutInfo(d.statut);
+    const expDate = _devisExpiryDate(d);
+    const cli = d.client || {};
+
+    document.getElementById('devis-preview-numero').textContent = '🧾 ' + d.numero;
+    document.getElementById('devis-preview-substatus').innerHTML =
+        '<span style="background:rgba(255,255,255,0.22);padding:2px 9px;border-radius:10px;font-weight:700;">' + statutInfo.label + '</span>'
+        + ' · Émis le ' + _devisFmtDateFR(d.dateEmission)
+        + (expDate ? (' · Valable jusqu\'au ' + _devisFmtDateFR(expDate.toISOString().slice(0,10))) : '');
+
+    const itemsRows = (d.items||[]).map(function(l){
+        return '<tr>'
+            + '<td style="padding:6px 8px;border-bottom:1px solid var(--border-color,#eee);color:var(--text-main);">' + (l.nom||'').replace(/</g,'&lt;') + '</td>'
+            + '<td style="padding:6px 8px;border-bottom:1px solid var(--border-color,#eee);text-align:center;color:var(--text-muted,#888);">' + l.quantite + '</td>'
+            + '<td style="padding:6px 8px;border-bottom:1px solid var(--border-color,#eee);text-align:right;color:var(--text-muted,#888);">' + _devisFmtEUR(l.prixUnitaire) + '</td>'
+            + '<td style="padding:6px 8px;border-bottom:1px solid var(--border-color,#eee);text-align:right;font-weight:700;color:var(--text-main);">' + _devisFmtEUR((parseFloat(l.quantite)||0)*(parseFloat(l.prixUnitaire)||0)) + '</td>'
+            + '</tr>';
+    }).join('');
+
+    let html = '';
+    html += '<div style="background:var(--bg-body,#f4f7f6);border-radius:10px;padding:12px 14px;margin-bottom:16px;">';
+    html +=   '<div style="font-size:0.68rem;text-transform:uppercase;letter-spacing:0.5px;color:var(--text-muted,#888);font-weight:700;margin-bottom:6px;">👤 Client</div>';
+    html +=   '<div style="font-weight:800;color:var(--text-main);font-size:0.92rem;">' + (cli.nom||'—').replace(/</g,'&lt;') + '</div>';
+    if (cli.adresse) html += '<div style="font-size:0.78rem;color:var(--text-muted,#888);margin-top:3px;">' + cli.adresse.replace(/</g,'&lt;') + '</div>';
+    if (cli.tel)     html += '<div style="font-size:0.78rem;color:var(--text-muted,#888);">📞 ' + cli.tel.replace(/</g,'&lt;') + '</div>';
+    if (cli.email)   html += '<div style="font-size:0.78rem;color:var(--text-muted,#888);">✉️ ' + cli.email.replace(/</g,'&lt;') + '</div>';
+    html += '</div>';
+
+    html += '<table style="width:100%;border-collapse:collapse;font-size:0.83rem;margin-bottom:14px;">';
+    html +=   '<thead><tr style="background:var(--bg-card-3,#f4f6f9);text-align:left;">';
+    html +=     '<th style="padding:7px 8px;">Désignation</th><th style="padding:7px 8px;text-align:center;">Qté</th><th style="padding:7px 8px;text-align:right;">P.U.</th><th style="padding:7px 8px;text-align:right;">Total</th>';
+    html +=   '</tr></thead><tbody>' + itemsRows + '</tbody></table>';
+
+    html += '<div style="display:flex;justify-content:flex-end;' + (d.notes ? 'margin-bottom:14px;' : '') + '">';
+    html +=   '<div style="width:min(260px,100%);display:flex;flex-direction:column;gap:4px;">';
+    html +=     '<div style="display:flex;justify-content:space-between;font-size:0.8rem;color:var(--text-muted,#888);"><span>' + (d.tvaPct ? 'Sous-total HT' : 'Sous-total (TTC)') + '</span><span>' + _devisFmtEUR(d.sousTotal) + '</span></div>';
+    if (d.remisePct) html += '<div style="display:flex;justify-content:space-between;font-size:0.8rem;color:var(--text-muted,#888);"><span>Remise (' + d.remisePct + '%)</span><span>- ' + _devisFmtEUR(d.sousTotal - d.totalHT) + '</span></div>';
+    if (d.tvaPct)    html += '<div style="display:flex;justify-content:space-between;font-size:0.8rem;color:var(--text-muted,#888);"><span>TVA (' + d.tvaPct + '%)</span><span>' + _devisFmtEUR(d.totalTTC - d.totalHT) + '</span></div>';
+    html +=     '<div style="display:flex;justify-content:space-between;font-weight:900;font-size:1rem;color:#e38737;border-top:1.5px solid var(--border-color,#ddd);padding-top:6px;margin-top:2px;"><span>TOTAL TTC</span><span>' + _devisFmtEUR(d.totalTTC) + '</span></div>';
+    html +=   '</div>';
+    html += '</div>';
+
+    if (d.notes) {
+        html += '<div style="background:#fff8e1;border:1px solid #f3e0a3;border-radius:8px;padding:10px 12px;font-size:0.8rem;color:#6b5700;white-space:pre-wrap;">' + d.notes.replace(/</g,'&lt;') + '</div>';
+    }
+
+    document.getElementById('devis-preview-body').innerHTML = html;
+
+    document.getElementById('devis-preview-btn-edit').onclick = function(){ document.getElementById('devis-preview-modal').style.display = 'none'; _devisOpenEditor(d.id); };
+    document.getElementById('devis-preview-btn-pdf').onclick  = function(){ _devisGeneratePDF(d.id); };
+    document.getElementById('devis-preview-btn-dup').onclick  = function(){ document.getElementById('devis-preview-modal').style.display = 'none'; _devisDuplicate(d.id); };
+    document.getElementById('devis-preview-btn-del').onclick  = function(){ document.getElementById('devis-preview-modal').style.display = 'none'; _devisDelete(d.id); };
+
+    document.getElementById('devis-preview-modal').style.display = 'flex';
+};
 
 // ── Édition ──────────────────────────────────────────────────────────────
 window._devisOpenEditor = function(id) {
