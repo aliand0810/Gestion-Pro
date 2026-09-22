@@ -1386,6 +1386,9 @@
         <label style="display:flex;flex-direction:column;gap:4px;font-size:0.74rem;color:#1b7a43;font-weight:700;">Heure de validation
           <input id="devis-validation-heure" type="time" style="padding:8px 10px;border:1.5px solid #27ae60;border-radius:8px;font-size:0.85rem;background:var(--input-bg,#fff);color:var(--text-main);">
         </label>
+        <label style="display:flex;flex-direction:column;gap:4px;font-size:0.74rem;color:#1b7a43;font-weight:700;">N° de série de validation
+          <input id="devis-validation-serial" type="text" disabled placeholder="Généré automatiquement" style="padding:8px 10px;border:1.5px solid #27ae60;border-radius:8px;font-size:0.85rem;background:rgba(255,255,255,0.6);color:#1b7a43;font-weight:700;">
+        </label>
       </div>
 
       <div>
@@ -7044,6 +7047,7 @@ function _devisStampHTML(d) {
         +   '<div style="line-height:1.2;">'
         +     '<div style="font-weight:900;font-size:15px;letter-spacing:1.5px;color:#27ae60;">✅ VALIDÉ</div>'
         +     (label ? ('<div style="font-size:11px;font-weight:700;color:#27ae60;opacity:0.85;">' + label + '</div>') : '')
+        +     (d.validationSerial ? ('<div style="font-size:9.5px;font-weight:700;color:#27ae60;opacity:0.7;letter-spacing:0.4px;">N° ' + d.validationSerial + '</div>') : '')
         +   '</div>'
         + '</div>'
         + '</div>';
@@ -7056,6 +7060,23 @@ function _devisNextNumero() {
         if (m && parseInt(m[1],10) === year) max = Math.max(max, parseInt(m[2],10));
     });
     return 'DEV-' + year + '-' + String(max + 1).padStart(4, '0');
+}
+// Numéro de série du tampon de validation — format enrichi encodant directement la date et
+// l'heure de validation, le numéro du devis concerné (traçabilité directe vers le document) et
+// un code aléatoire de 4 caractères qui garantit l'unicité même en cas de validations simultanées
+// sur plusieurs appareils (pas de dépendance à un compteur partagé qui pourrait entrer en conflit
+// en usage hors-ligne/multi-appareils) : "VAL-AAAAMMJJ-HHMM-<numéro du devis>-XXXX".
+// Généré une seule fois par devis, à sa première acceptation, puis conservé à l'identique.
+function _devisNextValidationSerial(validatedAtStr, numero) {
+    const dt = validatedAtStr ? new Date(validatedAtStr) : new Date();
+    const ok = !isNaN(dt.getTime());
+    const yyyy = ok ? dt.getFullYear() : new Date().getFullYear();
+    const mm = String((ok ? dt.getMonth() : new Date().getMonth()) + 1).padStart(2, '0');
+    const dd = String(ok ? dt.getDate() : new Date().getDate()).padStart(2, '0');
+    const hh = String(ok ? dt.getHours() : new Date().getHours()).padStart(2, '0');
+    const mi = String(ok ? dt.getMinutes() : new Date().getMinutes()).padStart(2, '0');
+    const rand = (Math.random().toString(36).slice(2, 6) + '0000').slice(0, 4).toUpperCase();
+    return 'VAL-' + yyyy + mm + dd + '-' + hh + mi + '-' + (numero || 'DEV') + '-' + rand;
 }
 function _devisStatutInfo(statut) {
     switch(statut) {
@@ -7270,6 +7291,7 @@ window._devisOpenEditor = function(id) {
     const valDT = d.validatedAt ? new Date(d.validatedAt) : null;
     document.getElementById('devis-validation-date').value = (valDT && !isNaN(valDT.getTime())) ? valDT.toISOString().slice(0,10) : '';
     document.getElementById('devis-validation-heure').value = (valDT && !isNaN(valDT.getTime())) ? (String(valDT.getHours()).padStart(2,'0') + ':' + String(valDT.getMinutes()).padStart(2,'0')) : '';
+    document.getElementById('devis-validation-serial').value = d.validationSerial || '';
     const valRow = document.getElementById('devis-validation-row');
     if (valRow) valRow.style.display = (d.statut === 'accepte') ? 'grid' : 'none';
 
@@ -7477,11 +7499,20 @@ function _devisCollect() {
     } else if (statutVal === 'accepte') {
         validatedAt = new Date().toISOString().slice(0,19);
     }
+    // N° de série de validation : conservé à l'identique s'il existe déjà (jamais régénéré, même
+    // si le statut change puis redevient "Accepté"), sinon généré automatiquement dès que le
+    // devis passe pour la première fois à "Accepté" — chaque validation reste ainsi unique et traçable.
+    const _devisExisting = _devisCurrentId ? _devisGetAll().find(function(x){ return x.id === _devisCurrentId; }) : null;
+    let validationSerial = _devisExisting ? (_devisExisting.validationSerial || null) : null;
+    if (!validationSerial && statutVal === 'accepte') {
+        validationSerial = _devisNextValidationSerial(validatedAt, modalEl.dataset.numero);
+    }
     return {
         id: _devisCurrentId || ('DEV-' + Date.now() + '-' + Math.random().toString(36).slice(2,6)),
         numero: modalEl.dataset.numero,
         statut: statutVal,
         validatedAt: validatedAt,
+        validationSerial: validationSerial,
         dateEmission: document.getElementById('devis-date').value,
         validiteJours: parseInt(document.getElementById('devis-validite').value,10) || 0,
         client: {
