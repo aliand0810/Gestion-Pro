@@ -1369,12 +1369,22 @@
           <input id="devis-expire" type="text" disabled style="padding:8px 10px;border:1.5px solid var(--border-color,#ddd);border-radius:8px;font-size:0.85rem;background:var(--bg-card-3,#f4f6f9);color:var(--text-muted,#888);">
         </label>
         <label style="display:flex;flex-direction:column;gap:4px;font-size:0.74rem;color:var(--text-muted,#888);font-weight:700;">Statut
-          <select id="devis-statut" style="padding:8px 10px;border:1.5px solid var(--border-color,#ddd);border-radius:8px;font-size:0.85rem;background:var(--input-bg,#fff);color:var(--text-main);">
+          <select id="devis-statut" onchange="_devisOnStatutChange()" style="padding:8px 10px;border:1.5px solid var(--border-color,#ddd);border-radius:8px;font-size:0.85rem;background:var(--input-bg,#fff);color:var(--text-main);">
             <option value="brouillon">📝 Brouillon</option>
             <option value="envoye">📤 Envoyé</option>
             <option value="accepte">✅ Accepté</option>
             <option value="refuse">❌ Refusé</option>
           </select>
+        </label>
+      </div>
+
+      <div id="devis-validation-row" style="display:none;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:8px;background:rgba(39,174,96,0.08);border:1.5px solid #27ae60;border-radius:9px;padding:10px 12px;">
+        <label style="display:flex;flex-direction:column;gap:4px;font-size:0.74rem;color:#1b7a43;font-weight:700;grid-column:1/-1;">✅ Tampon « Validé » — date et heure (rempli automatiquement, modifiable)</label>
+        <label style="display:flex;flex-direction:column;gap:4px;font-size:0.74rem;color:#1b7a43;font-weight:700;">Date de validation
+          <input id="devis-validation-date" type="date" style="padding:8px 10px;border:1.5px solid #27ae60;border-radius:8px;font-size:0.85rem;background:var(--input-bg,#fff);color:var(--text-main);">
+        </label>
+        <label style="display:flex;flex-direction:column;gap:4px;font-size:0.74rem;color:#1b7a43;font-weight:700;">Heure de validation
+          <input id="devis-validation-heure" type="time" style="padding:8px 10px;border:1.5px solid #27ae60;border-radius:8px;font-size:0.85rem;background:var(--input-bg,#fff);color:var(--text-main);">
         </label>
       </div>
 
@@ -7008,6 +7018,36 @@ function _devisExpiryDate(d) {
     base.setDate(base.getDate() + (parseInt(d.validiteJours,10) || 0));
     return base;
 }
+
+// Logo affiché sur le devis (en-tête + tampon) : le logo personnalisé s'il est configuré dans
+// les Paramètres, sinon le logo COVO par défaut embarqué dans l'application.
+function _devisLogoSrc() { return appSettings.logoUrl || ('data:image/png;base64,' + COVO_LOGO_B64); }
+
+// Libellé "JJ/MM/AAAA à HH:MM" pour l'horodatage de validation, ou chaîne vide si absent/invalide.
+function _devisValidationLabel(d) {
+    if (!d.validatedAt) return '';
+    const dt = new Date(d.validatedAt);
+    if (isNaN(dt.getTime())) return '';
+    const dateLabel = dt.toLocaleDateString('fr-FR', { day:'2-digit', month:'2-digit', year:'numeric' });
+    const heureLabel = String(dt.getHours()).padStart(2,'0') + ':' + String(dt.getMinutes()).padStart(2,'0');
+    return dateLabel + ' à ' + heureLabel;
+}
+
+// Tampon visuel "VALIDÉ" (logo COVO + date/heure de validation) affiché en bas du devis, dans
+// l'aperçu en application comme dans le PDF généré, uniquement quand le devis est "Accepté".
+function _devisStampHTML(d) {
+    if (d.statut !== 'accepte') return '';
+    const label = _devisValidationLabel(d);
+    return '<div style="display:flex;justify-content:flex-end;margin-top:18px;">'
+        + '<div style="display:inline-flex;align-items:center;gap:10px;border:3px solid #27ae60;border-radius:10px;padding:10px 18px;transform:rotate(-6deg);background:rgba(39,174,96,0.07);">'
+        +   '<img src="' + _devisLogoSrc() + '" alt="" style="width:32px;height:32px;border-radius:50%;flex-shrink:0;object-fit:cover;">'
+        +   '<div style="line-height:1.2;">'
+        +     '<div style="font-weight:900;font-size:15px;letter-spacing:1.5px;color:#27ae60;">✅ VALIDÉ</div>'
+        +     (label ? ('<div style="font-size:11px;font-weight:700;color:#27ae60;opacity:0.85;">' + label + '</div>') : '')
+        +   '</div>'
+        + '</div>'
+        + '</div>';
+}
 function _devisNextNumero() {
     const year = new Date().getFullYear();
     let max = 0;
@@ -7172,6 +7212,8 @@ window._devisOpenPreview = function(id) {
         html += '<div style="background:#fff8e1;border:1px solid #f3e0a3;border-radius:8px;padding:10px 12px;font-size:0.8rem;color:#6b5700;white-space:pre-wrap;">' + d.notes.replace(/</g,'&lt;') + '</div>';
     }
 
+    html += _devisStampHTML(d);
+
     document.getElementById('devis-preview-body').innerHTML = html;
 
     document.getElementById('devis-preview-btn-edit').onclick = function(){ document.getElementById('devis-preview-modal').style.display = 'none'; _devisOpenEditor(d.id); };
@@ -7223,10 +7265,37 @@ window._devisOpenEditor = function(id) {
     modalEl.dataset.createdAt = d.createdAt;
     modalEl.dataset.createdBy = d.createdBy || '';
 
+    // Tampon « Validé » : pré-remplit la date/heure de validation déjà enregistrées (le cas échéant)
+    // — le champ reste modifiable manuellement, et _devisOnStatutChange() gère l'affichage/l'auto-remplissage.
+    const valDT = d.validatedAt ? new Date(d.validatedAt) : null;
+    document.getElementById('devis-validation-date').value = (valDT && !isNaN(valDT.getTime())) ? valDT.toISOString().slice(0,10) : '';
+    document.getElementById('devis-validation-heure').value = (valDT && !isNaN(valDT.getTime())) ? (String(valDT.getHours()).padStart(2,'0') + ':' + String(valDT.getMinutes()).padStart(2,'0')) : '';
+    const valRow = document.getElementById('devis-validation-row');
+    if (valRow) valRow.style.display = (d.statut === 'accepte') ? 'grid' : 'none';
+
     _devisPopulateCatalogList();
     _devisRenderLines();
     _devisRecalc();
     modalEl.style.display = 'flex';
+};
+
+// Bascule l'affichage du bloc "Tampon Validé" (date/heure) selon le statut choisi, et pré-remplit
+// automatiquement la date/heure du jour la première fois qu'on passe à "Accepté" (jamais si déjà rempli,
+// pour ne jamais écraser une correction manuelle faite auparavant).
+window._devisOnStatutChange = function() {
+    const statut = document.getElementById('devis-statut').value;
+    const row = document.getElementById('devis-validation-row');
+    if (!row) return;
+    if (statut === 'accepte') {
+        row.style.display = 'grid';
+        const dEl = document.getElementById('devis-validation-date');
+        const hEl = document.getElementById('devis-validation-heure');
+        const now = new Date();
+        if (dEl && !dEl.value) dEl.value = now.toISOString().slice(0,10);
+        if (hEl && !hEl.value) hEl.value = String(now.getHours()).padStart(2,'0') + ':' + String(now.getMinutes()).padStart(2,'0');
+    } else {
+        row.style.display = 'none';
+    }
 };
 
 // Alimente la <datalist> utilisée par le champ "Désignation" de chaque ligne (autocomplétion
@@ -7396,10 +7465,23 @@ function _devisCollect() {
     if (!_devisLines.some(function(l){ return (l.nom||'').trim(); })) { showScanToast('⚠️ Ajoutez au moins un article'); return null; }
     const totals = _devisRecalc();
     const modalEl = document.getElementById('devis-modal');
+    const statutVal = document.getElementById('devis-statut').value;
+    // Tampon « Validé » : horodatage lu depuis les champs (auto-remplis à l'acceptation, modifiables
+    // manuellement). Conservé même si le statut est ensuite changé, pour ne rien perdre si le devis
+    // redevient "Accepté" plus tard ; recalculé seulement si les champs sont vides à l'instant T.
+    const valDateStr = document.getElementById('devis-validation-date').value;
+    const valHeureStr = document.getElementById('devis-validation-heure').value;
+    let validatedAt = null;
+    if (valDateStr) {
+        validatedAt = valDateStr + 'T' + (valHeureStr || '00:00') + ':00';
+    } else if (statutVal === 'accepte') {
+        validatedAt = new Date().toISOString().slice(0,19);
+    }
     return {
         id: _devisCurrentId || ('DEV-' + Date.now() + '-' + Math.random().toString(36).slice(2,6)),
         numero: modalEl.dataset.numero,
-        statut: document.getElementById('devis-statut').value,
+        statut: statutVal,
+        validatedAt: validatedAt,
         dateEmission: document.getElementById('devis-date').value,
         validiteJours: parseInt(document.getElementById('devis-validite').value,10) || 0,
         client: {
@@ -7469,7 +7551,7 @@ window._devisGeneratePDF = function(id) {
     if (!d) { showScanToast('Devis introuvable'); return; }
     const shopName = (appSettings.companyName || appSettings.shopName || 'Mon Entreprise');
     // Logo personnalisé si configuré dans les paramètres, sinon le logo COVO par défaut (toujours affiché en haut du devis).
-    const logoUrl = appSettings.logoUrl || ('data:image/png;base64,' + COVO_LOGO_B64);
+    const logoUrl = _devisLogoSrc();
     const expDate = _devisExpiryDate(d);
     const itemsRows = (d.items||[]).map(function(l){
         return '<tr><td>' + (l.nom||'').replace(/</g,'&lt;') + '</td>'
@@ -7482,7 +7564,7 @@ window._devisGeneratePDF = function(id) {
         + '<title>Devis ' + d.numero + '</title>'
         + '<style>'
         + '* { box-sizing:border-box; }'
-        + 'body{font-family:Arial,Helvetica,sans-serif;font-size:12px;color:#1e2d3d;margin:0;padding:28px;}'
+        + 'body{font-family:Arial,Helvetica,sans-serif;font-size:12px;color:#1e2d3d;margin:0;padding:28px;-webkit-print-color-adjust:exact;print-color-adjust:exact;}'
         + '.toolbar{padding:0 0 14px;display:flex;justify-content:flex-end;gap:8px;}'
         + '.toolbar button{padding:9px 18px;border:none;border-radius:8px;cursor:pointer;font-weight:700;font-size:0.85rem;background:linear-gradient(135deg,#2c6fad,#1b456b);color:#fff;}'
         + '.head{display:flex;justify-content:space-between;align-items:flex-start;border-bottom:3px solid #2c6fad;padding-bottom:14px;margin-bottom:20px;}'
@@ -7534,6 +7616,7 @@ window._devisGeneratePDF = function(id) {
         +   '<tr class="ttc"><td>TOTAL ' + (d.tvaPct ? 'TTC' : '') + '</td><td class="r">' + _devisFmtEUR(d.totalTTC) + '</td></tr>'
         + '</table></div>'
         + (d.notes ? ('<div class="notes">' + d.notes.replace(/</g,'&lt;').replace(/\n/g,'<br>') + '</div>') : '')
+        + _devisStampHTML(d)
         + '<div class="footer">Devis généré le ' + new Date().toLocaleDateString('fr-FR',{day:'2-digit',month:'long',year:'numeric'}) + ' — ' + shopName.replace(/</g,'&lt;') + '</div>'
         + '</body></html>';
     const w = window.open('', '_blank');
