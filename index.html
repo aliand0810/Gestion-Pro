@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="fr">
 <head>
@@ -7107,6 +7108,11 @@ function _devisEffectiveStatut(d, today) {
     return expired ? 'expire' : (d.statut || 'brouillon');
 }
 
+// Suppression d'un devis réservée à l'Admin-Développeur (compte maître, cpIsMasterDev()) : un
+// devis accepté/envoyé peut avoir une valeur contractuelle, la suppression n'est donc plus un
+// geste du quotidien pour tous les utilisateurs — seul un bouton "Modifier" reste accessible.
+function _devisCanDelete() { return (typeof cpIsMasterDev === 'function') && cpIsMasterDev(); }
+
 function _devisRenderList() {
     const body = document.getElementById('devis-list-body');
     const empty = document.getElementById('devis-empty');
@@ -7173,7 +7179,7 @@ function _devisRenderList() {
             +   '<div onclick="event.stopPropagation()" style="display:flex;gap:2px;border-left:1.5px solid var(--border-color,#eee);padding-left:10px;flex-shrink:0;">'
             +     '<button class="devis-icon-btn" onclick="_devisGeneratePDF(\'' + d.id + '\')" title="PDF / Imprimer">🖨️</button>'
             +     '<button class="devis-icon-btn" onclick="_devisDuplicate(\'' + d.id + '\')" title="Dupliquer">📋</button>'
-            +     '<button class="devis-icon-btn" onclick="_devisDelete(\'' + d.id + '\')" title="Supprimer">🗑️</button>'
+            +     (_devisCanDelete() ? ('<button class="devis-icon-btn" onclick="_devisDelete(\'' + d.id + '\')" title="Supprimer">🗑️</button>') : '')
             +   '</div>'
             + '</div>'
             + '</div>';
@@ -7240,7 +7246,12 @@ window._devisOpenPreview = function(id) {
     document.getElementById('devis-preview-btn-edit').onclick = function(){ document.getElementById('devis-preview-modal').style.display = 'none'; _devisOpenEditor(d.id); };
     document.getElementById('devis-preview-btn-pdf').onclick  = function(){ _devisGeneratePDF(d.id); };
     document.getElementById('devis-preview-btn-dup').onclick  = function(){ document.getElementById('devis-preview-modal').style.display = 'none'; _devisDuplicate(d.id); };
-    document.getElementById('devis-preview-btn-del').onclick  = function(){ document.getElementById('devis-preview-modal').style.display = 'none'; _devisDelete(d.id); };
+    const previewDelBtn = document.getElementById('devis-preview-btn-del');
+    if (previewDelBtn) {
+        // Bouton Supprimer masqué pour tout le monde sauf l'Admin-Développeur (cpIsMasterDev()).
+        previewDelBtn.style.display = _devisCanDelete() ? '' : 'none';
+        previewDelBtn.onclick = function(){ document.getElementById('devis-preview-modal').style.display = 'none'; _devisDelete(d.id); };
+    }
 
     document.getElementById('devis-preview-modal').style.display = 'flex';
 };
@@ -7567,6 +7578,7 @@ window._devisDuplicate = function(id) {
 };
 
 window._devisDelete = function(id) {
+    if (!_devisCanDelete()) { showScanToast('⛔ Suppression réservée à l\'Admin-Développeur'); return; }
     const d = _devisGetAll().find(function(x){ return x.id === id; });
     if (!d) return;
     if (!confirm('Supprimer définitivement le devis ' + d.numero + ' ?')) return;
