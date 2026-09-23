@@ -245,7 +245,7 @@
     <button data-tab="gst-config" onclick="gstShowTab('gst-config')">&#9881;&#65039; Configuration</button>
     <button data-tab="gst-etiquettes" onclick="gstShowTab('gst-etiquettes')">&#127991;&#65039; &Eacute;tiquettes</button>
     <button data-tab="gst-tickets" onclick="gstShowTab('gst-tickets')">&#129534; Tickets oubli&eacute;s</button>
-    <button data-tab="gst-devis" onclick="gstShowTab('gst-devis')">🧾 Devis</button>
+    <button data-tab="gst-devis" onclick="gstShowTab('gst-devis')">🧾 Devis / Factures</button>
 </div>
 
 
@@ -1300,15 +1300,19 @@
 <!-- ===== ONGLET DEVIS ==================================================== -->
 <div class="gst-panel" id="gst-devis">
 <div style="padding:14px 18px;">
-    <div style="display:flex;align-items:center;justify-content:space-between;gap:14px;flex-wrap:wrap;margin-bottom:18px;padding-bottom:14px;border-bottom:1.5px solid var(--border-color,#eee);">
+    <div style="display:flex;align-items:center;justify-content:space-between;gap:14px;flex-wrap:wrap;margin-bottom:14px;padding-bottom:14px;border-bottom:1.5px solid var(--border-color,#eee);">
         <div style="display:flex;align-items:center;gap:12px;">
-            <div style="width:44px;height:44px;border-radius:12px;background:linear-gradient(135deg,#2c6fad,#1b456b);display:flex;align-items:center;justify-content:center;font-size:1.3rem;flex-shrink:0;box-shadow:0 4px 12px rgba(44,111,173,0.3);">🧾</div>
+            <div id="devis-panel-icon" style="width:44px;height:44px;border-radius:12px;background:linear-gradient(135deg,#2c6fad,#1b456b);display:flex;align-items:center;justify-content:center;font-size:1.3rem;flex-shrink:0;box-shadow:0 4px 12px rgba(44,111,173,0.3);">🧾</div>
             <div>
-                <div style="font-weight:900;font-size:1.08rem;color:var(--text-main);letter-spacing:-0.2px;">Devis</div>
-                <div style="font-size:0.78rem;color:var(--text-muted,#888);">Créez, suivez et imprimez vos devis clients</div>
+                <div id="devis-panel-title" style="font-weight:900;font-size:1.08rem;color:var(--text-main);letter-spacing:-0.2px;">Devis</div>
+                <div id="devis-panel-subtitle" style="font-size:0.78rem;color:var(--text-muted,#888);">Créez, suivez et imprimez vos devis clients</div>
             </div>
         </div>
-        <button onclick="_devisOpenEditor(null)" style="padding:11px 20px;background:linear-gradient(135deg,#2c6fad,#1b456b);color:white;border:none;border-radius:10px;cursor:pointer;font-weight:800;font-size:0.86rem;white-space:nowrap;box-shadow:0 3px 10px rgba(44,111,173,0.35);">➕ Nouveau devis</button>
+        <button id="devis-btn-new" onclick="_devisOpenEditor(null)" style="padding:11px 20px;background:linear-gradient(135deg,#2c6fad,#1b456b);color:white;border:none;border-radius:10px;cursor:pointer;font-weight:800;font-size:0.86rem;white-space:nowrap;box-shadow:0 3px 10px rgba(44,111,173,0.35);">➕ Nouveau devis</button>
+    </div>
+    <div id="devis-view-toggle" style="display:flex;gap:6px;margin-bottom:16px;background:var(--bg-body,#f4f7f6);padding:4px;border-radius:11px;width:fit-content;">
+        <button type="button" id="devis-view-btn-devis" onclick="_devisSetView('devis')" style="padding:8px 16px;border:none;border-radius:8px;cursor:pointer;font-weight:800;font-size:0.83rem;">🧾 Devis</button>
+        <button type="button" id="devis-view-btn-facture" onclick="_devisSetView('facture')" style="padding:8px 16px;border:none;border-radius:8px;cursor:pointer;font-weight:800;font-size:0.83rem;">✅ Factures</button>
     </div>
     <div id="devis-stats-row" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-bottom:18px;"></div>
     <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:12px;">
@@ -1316,22 +1320,15 @@
             <input id="devis-search" type="text" placeholder="🔍 Rechercher un client, un numéro..." oninput="_devisRenderList()"
                 style="width:100%;padding:9px 12px;border:1.5px solid var(--border-color,#ddd);border-radius:9px;font-size:0.85rem;background:var(--input-bg,#fff);color:var(--text-main);">
         </div>
-        <select id="devis-filter-statut" onchange="_devisRenderList()" style="padding:9px 12px;border:1.5px solid var(--border-color,#ddd);border-radius:9px;font-size:0.83rem;background:var(--input-bg,#fff);color:var(--text-main);cursor:pointer;">
-            <option value="">Tous les statuts</option>
-            <option value="brouillon">📝 Brouillon</option>
-            <option value="envoye">📤 Envoyé</option>
-            <option value="accepte">✅ Accepté</option>
-            <option value="refuse">❌ Refusé</option>
-            <option value="expire">⌛ Expiré</option>
-        </select>
+        <select id="devis-filter-statut" onchange="_devisRenderList()" style="padding:9px 12px;border:1.5px solid var(--border-color,#ddd);border-radius:9px;font-size:0.83rem;background:var(--input-bg,#fff);color:var(--text-main);cursor:pointer;"></select>
     </div>
-    <div style="font-size:0.72rem;color:var(--text-muted,#888);margin-bottom:8px;">💡 Cliquez sur un devis pour l'aperçu complet — modification, PDF et suppression en un clic depuis là.</div>
+    <div id="devis-hint-text" style="font-size:0.72rem;color:var(--text-muted,#888);margin-bottom:8px;">💡 Cliquez sur un devis pour l'aperçu complet — modification, PDF et suppression en un clic depuis là.</div>
     <div id="devis-list-wrap">
         <div id="devis-list-body" style="display:flex;flex-direction:column;gap:8px;"></div>
         <div id="devis-empty" style="display:none;text-align:center;padding:40px 20px;color:var(--text-muted,#888);">
-            <div style="font-size:2.4rem;margin-bottom:8px;">🧾</div>
-            <div style="font-weight:700;">Aucun devis pour le moment</div>
-            <div style="font-size:0.82rem;margin-top:4px;">Cliquez sur « ➕ Nouveau devis » pour en créer un.</div>
+            <div id="devis-empty-icon" style="font-size:2.4rem;margin-bottom:8px;">🧾</div>
+            <div id="devis-empty-title" style="font-weight:700;">Aucun devis pour le moment</div>
+            <div id="devis-empty-sub" style="font-size:0.82rem;margin-top:4px;">Cliquez sur « ➕ Nouveau devis » pour en créer un.</div>
         </div>
     </div>
 </div>
@@ -7075,6 +7072,7 @@ function _covoRealBalanceAdjust(bucket, delta, desc) {
 
 let _devisCurrentId = null;   // id du devis en cours d'édition (null tant qu'aucun n'est créé)
 let _devisLines = [];         // lignes de l'article en cours d'édition (état local du formulaire)
+let _devisViewMode = 'devis'; // vue active de la liste : 'devis' (brouillon/envoyé/refusé/expiré) ou 'facture' (accepté)
 
 function _devisGetAll() {
     try { const v = JSON.parse(localStorage.getItem(DEVIS_KEY) || '[]'); return Array.isArray(v) ? v : []; }
@@ -7205,7 +7203,10 @@ function _devisPaymentSectionHTML(d) {
 function _devisStatutInfo(statut) {
     switch(statut) {
         case 'envoye':  return { label:'📤 Envoyé',    bg:'#fff8e1', fg:'#8a6d00' };
-        case 'accepte': return { label:'✅ Accepté',   bg:'#e8f5e9', fg:'#1b5e20' };
+        // Un devis accepté est désormais considéré comme transformé en facture (même numéro,
+        // même document) — le mot "Accepté" n'est donc plus utilisé, remplacé par "Facture"
+        // partout où ce badge de statut est affiché (liste, aperçu, PDF).
+        case 'accepte': return { label:'✅ Facture',   bg:'#e8f5e9', fg:'#1b5e20' };
         case 'refuse':  return { label:'❌ Refusé',    bg:'#fdecea', fg:'#a52714' };
         case 'expire':  return { label:'⌛ Expiré',    bg:'#f0f0f0', fg:'#777' };
         default:        return { label:'📝 Brouillon', bg:'#eef2f7', fg:'#455a70' };
@@ -7221,7 +7222,7 @@ function _devisStatCard(icon, val, label, color) {
         + '</div>';
 }
 
-function _devisInit() { _devisRenderList(); }
+function _devisInit() { _devisSetView(_devisViewMode || 'devis'); }
 
 // Statut affectif effectif d'un devis : "expire" prime sur brouillon/envoyé si la date de
 // validité est dépassée (jamais sur un devis déjà accepté ou refusé, qui reste tel quel).
@@ -7231,23 +7232,73 @@ function _devisEffectiveStatut(d, today) {
     return expired ? 'expire' : (d.statut || 'brouillon');
 }
 
+// Un devis "Accepté" est considéré comme transformé en facture : même document, même numéro,
+// seul le vocabulaire change (plus jamais "Devis" pour le désigner une fois accepté).
+function _devisIsFacture(d) { return !!(d && d.statut === 'accepte'); }
+function _devisDocLabel(d) { return _devisIsFacture(d) ? 'Facture' : 'Devis'; }
+// Regroupement du statut de règlement en 3 catégories, utilisé pour le filtre dédié à la vue
+// "Factures" (là où le filtre "vue Devis" utilise directement le statut brouillon/envoyé/...).
+function _devisPaymentBucket(d) {
+    const regle = _devisMontantRegle(d);
+    if (regle <= 0.004) return 'impaye';
+    return _devisResteAPayer(d) <= 0.004 ? 'solde' : 'partiel';
+}
+
 // Suppression d'un devis réservée à l'Admin-Développeur (compte maître, cpIsMasterDev()) : un
 // devis accepté/envoyé peut avoir une valeur contractuelle, la suppression n'est donc plus un
 // geste du quotidien pour tous les utilisateurs — seul un bouton "Modifier" reste accessible.
 function _devisCanDelete() { return (typeof cpIsMasterDev === 'function') && cpIsMasterDev(); }
+
+// Bascule entre la vue "🧾 Devis" (documents pas encore acceptés) et "✅ Factures" (devis
+// acceptés, désormais facturés) — deux univers distincts demandés explicitement pour ne plus
+// mélanger devis en cours et documents déjà facturés. Reconstruit le filtre secondaire (statut
+// pour les devis, statut de règlement pour les factures) et les textes d'en-tête/état vide.
+window._devisSetView = function(view) {
+    _devisViewMode = (view === 'facture') ? 'facture' : 'devis';
+    const isFacture = _devisViewMode === 'facture';
+    const btnDevis = document.getElementById('devis-view-btn-devis');
+    const btnFacture = document.getElementById('devis-view-btn-facture');
+    if (btnDevis)   { btnDevis.style.background   = isFacture ? 'transparent' : '#2c6fad'; btnDevis.style.color   = isFacture ? 'var(--text-muted,#888)' : '#fff'; }
+    if (btnFacture) { btnFacture.style.background = isFacture ? '#27ae60' : 'transparent'; btnFacture.style.color = isFacture ? '#fff' : 'var(--text-muted,#888)'; }
+
+    const icon = document.getElementById('devis-panel-icon');
+    const title = document.getElementById('devis-panel-title');
+    const subtitle = document.getElementById('devis-panel-subtitle');
+    if (icon) icon.textContent = isFacture ? '✅' : '🧾';
+    if (title) title.textContent = isFacture ? 'Factures' : 'Devis';
+    if (subtitle) subtitle.textContent = isFacture ? 'Devis acceptés, désormais facturés — suivez leurs règlements' : 'Créez, suivez et imprimez vos devis clients';
+    const newBtn = document.getElementById('devis-btn-new');
+    if (newBtn) newBtn.style.display = isFacture ? 'none' : '';
+    const hint = document.getElementById('devis-hint-text');
+    if (hint) hint.textContent = isFacture ? '💡 Cliquez sur une facture pour l\'aperçu complet, le PDF ou enregistrer un règlement.' : '💡 Cliquez sur un devis pour l\'aperçu complet — modification, PDF et suppression en un clic depuis là.';
+
+    const filterEl = document.getElementById('devis-filter-statut');
+    if (filterEl) {
+        filterEl.innerHTML = isFacture
+            ? '<option value="">Toutes les factures</option><option value="impaye">⏳ Non réglées</option><option value="partiel">🟡 Partiellement réglées</option><option value="solde">✅ Soldées</option>'
+            : '<option value="">Tous les statuts</option><option value="brouillon">📝 Brouillon</option><option value="envoye">📤 Envoyé</option><option value="refuse">❌ Refusé</option><option value="expire">⌛ Expiré</option>';
+    }
+    const searchEl = document.getElementById('devis-search');
+    if (searchEl) searchEl.placeholder = isFacture ? '🔍 Rechercher un client, un numéro de facture...' : '🔍 Rechercher un client, un numéro...';
+
+    _devisRenderList();
+};
 
 function _devisRenderList() {
     const body = document.getElementById('devis-list-body');
     const empty = document.getElementById('devis-empty');
     const statsRow = document.getElementById('devis-stats-row');
     if (!body) return;
+    const isFacture = _devisViewMode === 'facture';
     const searchEl = document.getElementById('devis-search');
     const q = (searchEl ? searchEl.value : '').trim().toLowerCase();
     const filterEl = document.getElementById('devis-filter-statut');
     const statutFilter = filterEl ? filterEl.value : '';
     const totalAll = _devisGetAll();
     const today = new Date(); today.setHours(0,0,0,0);
-    let list = totalAll.slice().sort(function(a,b){ return (b.createdAt||'').localeCompare(a.createdAt||''); });
+    // Première scission : univers "Devis" (pas encore accepté) vs univers "Factures" (accepté).
+    let list = totalAll.filter(function(d){ return isFacture ? _devisIsFacture(d) : !_devisIsFacture(d); })
+        .slice().sort(function(a,b){ return (b.createdAt||'').localeCompare(a.createdAt||''); });
     if (q) {
         list = list.filter(function(d){
             return (d.numero||'').toLowerCase().indexOf(q) !== -1 ||
@@ -7255,25 +7306,48 @@ function _devisRenderList() {
         });
     }
     if (statutFilter) {
-        list = list.filter(function(d){ return _devisEffectiveStatut(d, today) === statutFilter; });
+        list = list.filter(function(d){ return isFacture ? (_devisPaymentBucket(d) === statutFilter) : (_devisEffectiveStatut(d, today) === statutFilter); });
     }
     if (statsRow) {
-        const accepted = totalAll.filter(function(d){ return d.statut === 'accepte'; });
-        const pending  = totalAll.filter(function(d){ return d.statut === 'envoye' || d.statut === 'brouillon'; });
-        const sumTTC = accepted.reduce(function(s,d){ return s + (parseFloat(d.totalTTC)||0); }, 0);
-        statsRow.innerHTML =
-            _devisStatCard('🧾', totalAll.length, 'Total devis', '#2c6fad') +
-            _devisStatCard('✅', accepted.length, 'Acceptés', '#27ae60') +
-            _devisStatCard('⏳', pending.length, 'En attente', '#e67e22') +
-            _devisStatCard('💰', _devisFmtEUR(sumTTC), 'CA devis acceptés', '#1a73e8');
+        const scope = totalAll.filter(function(d){ return isFacture ? _devisIsFacture(d) : !_devisIsFacture(d); });
+        if (isFacture) {
+            const solde = scope.filter(function(d){ return _devisPaymentBucket(d) === 'solde'; });
+            const enAttente = scope.filter(function(d){ return _devisPaymentBucket(d) !== 'solde'; });
+            const sumTTC = scope.reduce(function(s,d){ return s + (parseFloat(d.totalTTC)||0); }, 0);
+            statsRow.innerHTML =
+                _devisStatCard('✅', scope.length, 'Factures', '#27ae60') +
+                _devisStatCard('💚', solde.length, 'Soldées', '#1b7a43') +
+                _devisStatCard('⏳', enAttente.length, 'En attente de règlement', '#e67e22') +
+                _devisStatCard('💰', _devisFmtEUR(sumTTC), 'CA facturé', '#1a73e8');
+        } else {
+            const brouillons = scope.filter(function(d){ return _devisEffectiveStatut(d, today) === 'brouillon'; });
+            const envoyes    = scope.filter(function(d){ return _devisEffectiveStatut(d, today) === 'envoye'; });
+            const autres     = scope.filter(function(d){ const s=_devisEffectiveStatut(d, today); return s === 'refuse' || s === 'expire'; });
+            statsRow.innerHTML =
+                _devisStatCard('🧾', scope.length, 'Devis en cours', '#2c6fad') +
+                _devisStatCard('📝', brouillons.length, 'Brouillons', '#455a70') +
+                _devisStatCard('📤', envoyes.length, 'Envoyés', '#8a6d00') +
+                _devisStatCard('⚠️', autres.length, 'Refusés / Expirés', '#a52714');
+        }
     }
     if (!list.length) {
         body.innerHTML = '';
         if (empty) {
             empty.style.display = 'block';
-            empty.querySelector('div:last-child').textContent = (q || statutFilter)
-                ? 'Aucun devis ne correspond à ce filtre.'
-                : "Cliquez sur « ➕ Nouveau devis » pour en créer un.";
+            const eIcon = document.getElementById('devis-empty-icon');
+            const eTitle = document.getElementById('devis-empty-title');
+            const eSub = document.getElementById('devis-empty-sub');
+            if (eIcon) eIcon.textContent = isFacture ? '✅' : '🧾';
+            if (q || statutFilter) {
+                if (eTitle) eTitle.textContent = isFacture ? 'Aucune facture ne correspond à ce filtre.' : 'Aucun devis ne correspond à ce filtre.';
+                if (eSub) eSub.textContent = '';
+            } else if (isFacture) {
+                if (eTitle) eTitle.textContent = 'Aucune facture pour le moment';
+                if (eSub) eSub.textContent = "Un devis devient une facture dès qu'il est accepté.";
+            } else {
+                if (eTitle) eTitle.textContent = 'Aucun devis pour le moment';
+                if (eSub) eSub.textContent = "Cliquez sur « ➕ Nouveau devis » pour en créer un.";
+            }
         }
         return;
     }
@@ -7288,7 +7362,7 @@ function _devisRenderList() {
             + '<div style="flex:1;min-width:0;display:flex;align-items:center;gap:14px;padding:11px 14px 11px 4px;flex-wrap:wrap;">'
             +   '<div style="flex:1;min-width:160px;">'
             +     '<div style="display:flex;align-items:baseline;gap:8px;flex-wrap:wrap;">'
-            +       '<span style="font-weight:800;color:#2c6fad;font-size:0.82rem;">' + (d.numero||'').replace(/</g,'&lt;') + '</span>'
+            +       '<span style="font-weight:800;color:' + (_devisIsFacture(d)?'#1b7a43':'#2c6fad') + ';font-size:0.82rem;">' + _devisDocLabel(d) + ' ' + (d.numero||'').replace(/</g,'&lt;') + '</span>'
             +       '<span style="font-weight:700;color:var(--text-main);font-size:0.92rem;">' + clientNom + '</span>'
             +     '</div>'
             +     '<div style="font-size:0.73rem;color:var(--text-muted,#888);margin-top:2px;">'
@@ -7321,7 +7395,7 @@ window._devisOpenPreview = function(id) {
     const expDate = _devisExpiryDate(d);
     const cli = d.client || {};
 
-    document.getElementById('devis-preview-numero').textContent = '🧾 ' + d.numero;
+    document.getElementById('devis-preview-numero').textContent = (_devisIsFacture(d) ? '✅ Facture ' : '🧾 Devis ') + d.numero;
     document.getElementById('devis-preview-substatus').innerHTML =
         '<span style="background:rgba(255,255,255,0.22);padding:2px 9px;border-radius:10px;font-weight:700;">' + statutInfo.label + '</span>'
         + ' · Émis le ' + _devisFmtDateFR(d.dateEmission)
@@ -7416,7 +7490,7 @@ window._devisOpenEditor = function(id) {
     _devisCurrentId = d.id;
     _devisLines = (d.items && d.items.length ? d.items : [{id:1,nom:'',quantite:1,prixUnitaire:0}]).map(function(l){ return Object.assign({}, l); });
 
-    document.getElementById('devis-modal-title').textContent = id ? '✏️ Modifier le devis' : '🧾 Nouveau devis';
+    document.getElementById('devis-modal-title').textContent = id ? ('✏️ Modifier ' + (_devisIsFacture(d) ? 'la facture' : 'le devis')) : '🧾 Nouveau devis';
     document.getElementById('devis-modal-num').textContent = d.numero;
     document.getElementById('devis-client-nom').value = (d.client&&d.client.nom) || '';
     document.getElementById('devis-client-tel').value = (d.client&&d.client.tel) || '';
@@ -7691,8 +7765,11 @@ window._devisSave = function(thenPrint) {
     if (idx >= 0) all[idx] = devis; else all.push(devis);
     _devisSaveAll(all);
     _devisCurrentId = devis.id;
-    showScanToast('✅ Devis ' + devis.numero + ' enregistré', 'success');
-    _devisRenderList();
+    showScanToast('✅ ' + _devisDocLabel(devis) + ' ' + devis.numero + ' enregistré' + (_devisIsFacture(devis)?'e':'') , 'success');
+    // Un devis qui vient d'être accepté bascule dans l'univers "Factures" : on y déplace la vue
+    // pour que l'utilisateur retrouve immédiatement son document, plutôt que de le voir disparaître
+    // silencieusement de la liste "Devis" qu'il regardait.
+    if (_devisIsFacture(devis) && _devisViewMode !== 'facture') { window._devisSetView('facture'); } else { _devisRenderList(); }
     if (thenPrint) _devisGeneratePDF(devis.id);
     window._devisCloseEditor();
 };
@@ -7741,7 +7818,7 @@ function _devisTicketLabel(s) {
 window._devisOpenPaymentModal = function(id) {
     const d = _devisGetAll().find(function(x){ return x.id === id; });
     if (!d) { showScanToast('Devis introuvable'); return; }
-    if (d.statut !== 'accepte') { showScanToast('⚠️ Le devis doit être « Accepté » avant d\'enregistrer un règlement'); return; }
+    if (d.statut !== 'accepte') { showScanToast('⚠️ Le devis doit être « Accepté » (transformé en facture) avant d\'enregistrer un règlement'); return; }
     _devisPaymentDevisId = id;
     _devisPaymentSelectedTicketId = null;
 
@@ -7916,15 +7993,15 @@ function _devisSettlePayment(devisId, ticketId, montant, mode, montantEspeces, m
 
     if (!Array.isArray(ticket.items)) ticket.items = [];
     const modeTxt = _devisPaymentModeLabel(mode, false);
-    ticket.items.push({ id: 'DEVIS-' + d.numero + '-' + Date.now(), name: 'Règlement devis ' + d.numero + ((d.client && d.client.nom) ? (' — ' + d.client.nom) : '') + ' (' + modeTxt + ')', price: montant, quantity: 1, paid: true, devisPaymentMode: mode });
+    ticket.items.push({ id: 'DEVIS-' + d.numero + '-' + Date.now(), name: 'Règlement facture ' + d.numero + ((d.client && d.client.nom) ? (' — ' + d.client.nom) : '') + ' (' + modeTxt + ')', price: montant, quantity: 1, paid: true, devisPaymentMode: mode });
     ticket.total = parseFloat(((parseFloat(ticket.total) || 0) + montant).toFixed(2));
     ticket.received = parseFloat(((parseFloat(ticket.received) || 0) + montant).toFixed(2));
     if (montantEspeces) ticket.receivedCash = parseFloat(((parseFloat(ticket.receivedCash) || 0) + montantEspeces).toFixed(2));
     if (montantCB)      ticket.receivedCB   = parseFloat(((parseFloat(ticket.receivedCB) || 0) + montantCB).toFixed(2));
     localStorage.setItem('covo_sales_history', JSON.stringify(list));
 
-    if (montantEspeces) _covoRealBalanceAdjust('especes', montantEspeces, 'Règlement devis ' + d.numero + ' (ticket #' + (ticket.ticketNum || ticket.id) + ')');
-    if (montantCB)      _covoRealBalanceAdjust('cb', montantCB, 'Règlement devis ' + d.numero + ' (ticket #' + (ticket.ticketNum || ticket.id) + ')');
+    if (montantEspeces) _covoRealBalanceAdjust('especes', montantEspeces, 'Règlement facture ' + d.numero + ' (ticket #' + (ticket.ticketNum || ticket.id) + ')');
+    if (montantCB)      _covoRealBalanceAdjust('cb', montantCB, 'Règlement facture ' + d.numero + ' (ticket #' + (ticket.ticketNum || ticket.id) + ')');
 
     if (!Array.isArray(d.paiements)) d.paiements = [];
     const cu = (typeof _covoCurrentUser === 'function') ? _covoCurrentUser() : null;
@@ -7961,8 +8038,9 @@ window._devisGeneratePDF = function(id) {
             + '<td class="r bold">' + _devisFmtEUR((parseFloat(l.quantite)||0)*(parseFloat(l.prixUnitaire)||0)) + '</td></tr>';
     }).join('');
     const statutInfo = _devisStatutInfo(d.statut);
+    const docLabel = _devisDocLabel(d);
     const htmlContent = '<!DOCTYPE html><html lang="fr"><head><meta charset="UTF-8">'
-        + '<title>Devis ' + d.numero + '</title>'
+        + '<title>' + docLabel + ' ' + d.numero + '</title>'
         + '<style>'
         + '* { box-sizing:border-box; }'
         + 'body{font-family:Arial,Helvetica,sans-serif;font-size:12px;color:#1e2d3d;margin:0;padding:28px;-webkit-print-color-adjust:exact;print-color-adjust:exact;}'
@@ -7996,7 +8074,7 @@ window._devisGeneratePDF = function(id) {
         +   (logoUrl ? ('<img src="' + logoUrl.replace(/"/g,'') + '" alt="logo"><br>') : '')
         +   '<div class="shop">' + shopName.replace(/</g,'&lt;') + '</div>'
         + '</div><div>'
-        +   '<h1>DEVIS</h1>'
+        +   '<h1>' + docLabel.toUpperCase() + '</h1>'
         +   '<div class="meta">N° ' + d.numero + '<br>'
         +   'Émis le ' + _devisFmtDateFR(d.dateEmission) + '<br>'
         +   'Valable jusqu\'au ' + (expDate ? _devisFmtDateFR(expDate.toISOString().slice(0,10)) : '—') + '<br>'
@@ -8018,7 +8096,7 @@ window._devisGeneratePDF = function(id) {
         + '</table></div>'
         + (d.notes ? ('<div class="notes">' + d.notes.replace(/</g,'&lt;').replace(/\n/g,'<br>') + '</div>') : '')
         + _devisStampHTML(d)
-        + '<div class="footer">Devis généré le ' + new Date().toLocaleDateString('fr-FR',{day:'2-digit',month:'long',year:'numeric'}) + ' — ' + shopName.replace(/</g,'&lt;') + '</div>'
+        + '<div class="footer">' + docLabel + ' généré' + (docLabel==='Facture'?'e':'') + ' le ' + new Date().toLocaleDateString('fr-FR',{day:'2-digit',month:'long',year:'numeric'}) + ' — ' + shopName.replace(/</g,'&lt;') + '</div>'
         + '</body></html>';
     const w = window.open('', '_blank');
     if (w) { w.document.write(htmlContent); w.document.close(); }
