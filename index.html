@@ -1502,6 +1502,12 @@
     <div style="overflow-y:auto;padding:20px;display:flex;flex-direction:column;gap:14px;">
       <div id="devis-payment-summary" style="display:flex;gap:10px;background:var(--bg-body,#f4f7f6);border-radius:10px;padding:10px 14px;font-size:0.82rem;"></div>
 
+      <div id="devis-payment-mode-toggle" style="display:flex;gap:6px;background:var(--bg-body,#f4f7f6);padding:4px;border-radius:10px;width:fit-content;">
+        <button type="button" id="devis-payment-mode-btn-ticket" onclick="_devisSetPaymentMode('ticket')" style="padding:7px 14px;border:none;border-radius:7px;cursor:pointer;font-weight:800;font-size:0.78rem;">🎫 Rattacher à un ticket</button>
+        <button type="button" id="devis-payment-mode-btn-direct" onclick="_devisSetPaymentMode('direct')" style="padding:7px 14px;border:none;border-radius:7px;cursor:pointer;font-weight:800;font-size:0.78rem;">⚡ Sans ticket (direct)</button>
+      </div>
+      <div id="devis-payment-direct-hint" style="display:none;font-size:0.72rem;line-height:1.4;color:#1b5e20;background:rgba(39,174,96,0.1);border:1px solid rgba(39,174,96,0.3);border-radius:8px;padding:8px 10px;">⚡ Ce règlement ne sera rattaché à aucun ticket de caisse existant. Il est comptabilisé dans l'objectif du jour de COVO Pro si réglé aujourd'hui, et met à jour le solde réel espèces/CB comme un règlement normal.</div>
+
       <div id="devis-payment-ticket-picker">
         <label style="display:flex;flex-direction:column;gap:4px;font-size:0.74rem;color:var(--text-muted,#888);font-weight:700;">🎫 Rattacher à un ticket de caisse existant
           <input id="devis-payment-ticket-search" type="text" placeholder="Rechercher par n° de ticket, client ou date…" oninput="_devisRenderTicketPicker(this.value)" style="padding:9px 10px;border:1.5px solid var(--border-color,#ddd);border-radius:8px;font-size:0.85rem;background:var(--input-bg,#fff);color:var(--text-main);">
@@ -7178,8 +7184,9 @@ function _devisPaymentHistoryRowsHTML(d) {
     if (!paiements.length) return '';
     return paiements.slice().reverse().map(function(p){
         const modeLabel = _devisPaymentModeLabel(p.mode);
+        const ticketLabel = p.ticketNumero ? (' · Ticket #' + p.ticketNumero) : (p.direct ? ' · ⚡ Sans ticket' : '');
         return '<div style="display:flex;justify-content:space-between;font-size:0.78rem;color:var(--text-muted,#888);padding:3px 0;">'
-            + '<span>' + _devisFmtDateFR((p.date||'').slice(0,10)) + ' · ' + modeLabel + (p.ticketNumero ? (' · Ticket #' + p.ticketNumero) : '') + '</span>'
+            + '<span>' + _devisFmtDateFR((p.date||'').slice(0,10)) + ' · ' + modeLabel + ticketLabel + '</span>'
             + '<span style="font-weight:700;color:var(--text-main);">' + _devisFmtEUR(p.montant) + '</span>'
             + '</div>';
     }).join('');
@@ -7804,6 +7811,7 @@ window._devisDelete = function(id) {
 // ── Règlement d'un devis (rattachement à un ticket de caisse existant) ─────────────────────
 let _devisPaymentDevisId = null;      // devis en cours de règlement dans #devis-payment-modal
 let _devisPaymentSelectedTicketId = null; // ticket de covo_sales_history sélectionné pour ce règlement
+let _devisPaymentDirectMode = false;  // true = règlement "sans ticket" (direct), false = rattaché à un ticket existant
 
 // Libellé compact d'un ticket de l'historique des ventes, pour la liste de sélection et le
 // récapitulatif "ticket sélectionné" — inclut le client fidélité/crédit s'il est connu (sinon rien).
@@ -7821,6 +7829,7 @@ window._devisOpenPaymentModal = function(id) {
     if (d.statut !== 'accepte') { showScanToast('⚠️ Le devis doit être « Accepté » (transformé en facture) avant d\'enregistrer un règlement'); return; }
     _devisPaymentDevisId = id;
     _devisPaymentSelectedTicketId = null;
+    _devisPaymentDirectMode = false;
 
     document.getElementById('devis-payment-numero').textContent = d.numero + ((d.client && d.client.nom) ? (' — ' + d.client.nom) : '');
     const regle = _devisMontantRegle(d);
@@ -7831,10 +7840,9 @@ window._devisOpenPaymentModal = function(id) {
         + '<div style="flex:1;"><div style="font-size:0.68rem;color:var(--text-muted,#888);">Reste à payer</div><div style="font-weight:800;color:#e38737;">' + _devisFmtEUR(reste) + '</div></div>';
 
     document.getElementById('devis-payment-ticket-search').value = '';
-    document.getElementById('devis-payment-ticket-picker').style.display = '';
-    document.getElementById('devis-payment-selected-ticket').style.display = 'none';
-    document.getElementById('devis-payment-fields').style.display = 'none';
+    document.getElementById('devis-payment-montant').value = '';
     _devisRenderTicketPicker('');
+    window._devisSetPaymentMode('ticket');
 
     const paiements = Array.isArray(d.paiements) ? d.paiements : [];
     document.getElementById('devis-payment-history').innerHTML = paiements.length
@@ -7843,6 +7851,51 @@ window._devisOpenPaymentModal = function(id) {
 
     _devisValidatePaymentForm();
     document.getElementById('devis-payment-modal').style.display = 'flex';
+};
+
+// Bascule entre "🎫 Rattacher à un ticket existant" (comportement historique) et "⚡ Sans ticket
+// (direct)" — demande explicite : pouvoir régler complètement un devis/facture sans le rattacher à
+// un ticket de caisse, tout en faisant basculer le montant dans l'objectif du jour de COVO Pro (déjà
+// géré par _devisTodayRegleHorsTicketDuJour(), qui compte tout paiement du jour sans ticket associé
+// — aucun changement nécessaire côté covo_pro_v28_credit.html).
+window._devisSetPaymentMode = function(mode) {
+    _devisPaymentDirectMode = (mode === 'direct');
+    const btnTicket = document.getElementById('devis-payment-mode-btn-ticket');
+    const btnDirect = document.getElementById('devis-payment-mode-btn-direct');
+    if (btnTicket) { btnTicket.style.background = _devisPaymentDirectMode ? 'transparent' : '#2c6fad'; btnTicket.style.color = _devisPaymentDirectMode ? 'var(--text-muted,#888)' : '#fff'; }
+    if (btnDirect) { btnDirect.style.background = _devisPaymentDirectMode ? '#e67e22' : 'transparent'; btnDirect.style.color = _devisPaymentDirectMode ? '#fff' : 'var(--text-muted,#888)'; }
+
+    const pickerWrap = document.getElementById('devis-payment-ticket-picker');
+    const selectedWrap = document.getElementById('devis-payment-selected-ticket');
+    const directHint = document.getElementById('devis-payment-direct-hint');
+    const fields = document.getElementById('devis-payment-fields');
+    const d = _devisGetAll().find(function(x){ return x.id === _devisPaymentDevisId; });
+    const reste = d ? _devisResteAPayer(d) : 0;
+
+    if (_devisPaymentDirectMode) {
+        if (pickerWrap) pickerWrap.style.display = 'none';
+        if (selectedWrap) selectedWrap.style.display = 'none';
+        if (directHint) directHint.style.display = 'block';
+        if (fields) fields.style.display = 'flex';
+        const montantEl = document.getElementById('devis-payment-montant');
+        if (montantEl) {
+            if (!montantEl.value) montantEl.value = reste > 0 ? reste.toFixed(2) : '';
+            montantEl.max = reste > 0 ? reste.toFixed(2) : '';
+        }
+        document.getElementById('devis-payment-mode').value = 'especes';
+    } else {
+        if (directHint) directHint.style.display = 'none';
+        if (_devisPaymentSelectedTicketId) {
+            if (pickerWrap) pickerWrap.style.display = 'none';
+            if (selectedWrap) selectedWrap.style.display = 'flex';
+            if (fields) fields.style.display = 'flex';
+        } else {
+            if (pickerWrap) pickerWrap.style.display = '';
+            if (selectedWrap) selectedWrap.style.display = 'none';
+            if (fields) fields.style.display = 'none';
+        }
+    }
+    _devisUpdatePaymentSplit();
 };
 
 function _devisRenderTicketPicker(query) {
@@ -7943,7 +7996,7 @@ window._devisSyncMixteFromCB = function() {
 function _devisValidatePaymentForm() {
     const btn = document.getElementById('devis-payment-confirm-btn');
     if (!btn) return;
-    let ok = !!_devisPaymentSelectedTicketId;
+    let ok = _devisPaymentDirectMode || !!_devisPaymentSelectedTicketId;
     if (ok) {
         const d = _devisGetAll().find(function(x){ return x.id === _devisPaymentDevisId; });
         const reste = d ? _devisResteAPayer(d) : 0;
@@ -7971,14 +8024,50 @@ window._devisConfirmPayment = function() {
     // Crédit / À compte : le montant est bien marqué "réglé" sur le devis et le ticket, mais
     // n'entre ni en espèces ni en CB dans la caisse (aucun mouvement physique de fonds).
 
-    const ok = _devisSettlePayment(_devisPaymentDevisId, _devisPaymentSelectedTicketId, montant, mode, montantEspeces, montantCB);
+    const ok = _devisPaymentDirectMode
+        ? _devisSettlePaymentDirect(_devisPaymentDevisId, montant, mode, montantEspeces, montantCB)
+        : _devisSettlePayment(_devisPaymentDevisId, _devisPaymentSelectedTicketId, montant, mode, montantEspeces, montantCB);
     if (!ok) return;
 
     document.getElementById('devis-payment-modal').style.display = 'none';
     _devisRenderList();
     _devisOpenPreview(_devisPaymentDevisId);
-    showScanToast('💰 Règlement enregistré', 'success');
+    showScanToast('💰 Règlement enregistré' + (_devisPaymentDirectMode ? ' (sans ticket)' : ''), 'success');
 };
+
+// Règlement "sans ticket" (direct) : aucune écriture dans covo_sales_history — le paiement n'est
+// journalisé que sur le devis/facture lui-même. Il met quand même à jour le solde réel espèces/CB
+// (mouvement de fonds bien réel) et, comme il porte la date du jour, est automatiquement compté
+// dans l'objectif journalier de COVO Pro par _devisTodayRegleHorsTicketDuJour() (qui additionne tout
+// paiement du jour dont le ticketId ne correspond à aucun ticket daté d'aujourd'hui — un ticketId
+// null tombe déjà dans ce cas, aucune modification n'était nécessaire côté covo_pro_v28_credit.html).
+function _devisSettlePaymentDirect(devisId, montant, mode, montantEspeces, montantCB) {
+    const d = _devisGetAll().find(function(x){ return x.id === devisId; });
+    if (!d) { showScanToast('Devis introuvable'); return false; }
+
+    if (montantEspeces) _covoRealBalanceAdjust('especes', montantEspeces, 'Règlement facture ' + d.numero + ' (sans ticket)');
+    if (montantCB)      _covoRealBalanceAdjust('cb', montantCB, 'Règlement facture ' + d.numero + ' (sans ticket)');
+
+    if (!Array.isArray(d.paiements)) d.paiements = [];
+    const cu = (typeof _covoCurrentUser === 'function') ? _covoCurrentUser() : null;
+    d.paiements.push({
+        id: Date.now() + '-' + Math.random().toString(36).slice(2,6),
+        date: new Date().toISOString(),
+        montant: montant,
+        montantEspeces: montantEspeces,
+        montantCB: montantCB,
+        mode: mode,
+        ticketId: null,
+        ticketNumero: null,
+        direct: true,
+        createdBy: cu ? (cu.username || cu.name || '') : ''
+    });
+    const all = _devisGetAll().map(function(x){ return x.id === d.id ? d : x; });
+    _devisSaveAll(all);
+
+    if (typeof cpDriveMarkDirty === 'function') cpDriveMarkDirty();
+    return true;
+}
 
 // Ajoute le règlement au ticket de caisse existant choisi (nouvelle ligne "Règlement devis ..."
 // + total augmenté d'autant), met à jour le solde réel espèces/CB, et journalise le règlement
