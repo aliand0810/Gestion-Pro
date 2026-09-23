@@ -1526,8 +1526,11 @@
             <option value="especes">💵 Espèces</option>
             <option value="cb">💳 Carte bancaire</option>
             <option value="mixte">🔀 Mixte (Espèces + CB)</option>
+            <option value="credit">🏦 Crédit</option>
+            <option value="compte">📒 À compte</option>
           </select>
         </label>
+        <div id="devis-payment-mode-hint" style="display:none;font-size:0.72rem;line-height:1.4;color:#8a6d1a;background:rgba(243,156,18,0.12);border:1px solid rgba(243,156,18,0.35);border-radius:8px;padding:8px 10px;">ℹ️ Ce mode n'affecte pas le solde espèces/CB de la caisse : le règlement est enregistré comme réglé, avec le mode explicitement mentionné sur le ticket.</div>
         <div id="devis-payment-mixte-row" style="display:none;gap:8px;">
           <label style="flex:1;display:flex;flex-direction:column;gap:4px;font-size:0.74rem;color:var(--text-muted,#888);font-weight:700;">Part espèces (€)
             <input id="devis-payment-especes" type="number" step="0.01" min="0" oninput="_devisSyncMixteFromEspeces()" style="padding:9px 10px;border:1.5px solid var(--border-color,#ddd);border-radius:8px;font-size:0.85rem;background:var(--input-bg,#fff);color:var(--text-main);">
@@ -7176,7 +7179,7 @@ function _devisPaymentHistoryRowsHTML(d) {
     const paiements = Array.isArray(d.paiements) ? d.paiements : [];
     if (!paiements.length) return '';
     return paiements.slice().reverse().map(function(p){
-        const modeLabel = p.mode === 'cb' ? '💳 CB' : (p.mode === 'mixte' ? '🔀 Mixte' : '💵 Espèces');
+        const modeLabel = _devisPaymentModeLabel(p.mode);
         return '<div style="display:flex;justify-content:space-between;font-size:0.78rem;color:var(--text-muted,#888);padding:3px 0;">'
             + '<span>' + _devisFmtDateFR((p.date||'').slice(0,10)) + ' · ' + modeLabel + (p.ticketNumero ? (' · Ticket #' + p.ticketNumero) : '') + '</span>'
             + '<span style="font-weight:700;color:var(--text-main);">' + _devisFmtEUR(p.montant) + '</span>'
@@ -7815,6 +7818,7 @@ window._devisClearSelectedTicket = function() {
 window._devisUpdatePaymentSplit = function() {
     const mode = document.getElementById('devis-payment-mode').value;
     const mixteRow = document.getElementById('devis-payment-mixte-row');
+    const hint = document.getElementById('devis-payment-mode-hint');
     const montant = parseFloat(document.getElementById('devis-payment-montant').value) || 0;
     if (mode === 'mixte') {
         mixteRow.style.display = 'flex';
@@ -7825,8 +7829,24 @@ window._devisUpdatePaymentSplit = function() {
     } else {
         mixteRow.style.display = 'none';
     }
+    if (hint) hint.style.display = (mode === 'credit' || mode === 'compte') ? 'block' : 'none';
     _devisValidatePaymentForm();
 };
+
+// Libellé du mode de règlement — utilisé à la fois pour l'affichage (historique du devis) et pour
+// le libellé de la ligne ajoutée au ticket de caisse, afin de toujours mentionner explicitement le
+// mode utilisé (espèces / CB / mixte / crédit / à compte).
+function _devisPaymentModeLabel(mode, withEmoji) {
+    const map = {
+        especes: ['💵', 'Espèces'],
+        cb: ['💳', 'CB'],
+        mixte: ['🔀', 'Mixte'],
+        credit: ['🏦', 'Crédit'],
+        compte: ['📒', 'À compte']
+    };
+    const e = map[mode] || map.especes;
+    return withEmoji === false ? e[1] : (e[0] + ' ' + e[1]);
+}
 
 window._devisSyncMixteFromEspeces = function() {
     const montant = parseFloat(document.getElementById('devis-payment-montant').value) || 0;
@@ -7870,7 +7890,9 @@ window._devisConfirmPayment = function() {
     let montantEspeces = 0, montantCB = 0;
     if (mode === 'especes') montantEspeces = montant;
     else if (mode === 'cb') montantCB = montant;
-    else { montantEspeces = parseFloat(document.getElementById('devis-payment-especes').value) || 0; montantCB = parseFloat(document.getElementById('devis-payment-cb').value) || 0; }
+    else if (mode === 'mixte') { montantEspeces = parseFloat(document.getElementById('devis-payment-especes').value) || 0; montantCB = parseFloat(document.getElementById('devis-payment-cb').value) || 0; }
+    // Crédit / À compte : le montant est bien marqué "réglé" sur le devis et le ticket, mais
+    // n'entre ni en espèces ni en CB dans la caisse (aucun mouvement physique de fonds).
 
     const ok = _devisSettlePayment(_devisPaymentDevisId, _devisPaymentSelectedTicketId, montant, mode, montantEspeces, montantCB);
     if (!ok) return;
@@ -7893,7 +7915,8 @@ function _devisSettlePayment(devisId, ticketId, montant, mode, montantEspeces, m
     if (!ticket) { showScanToast('⚠️ Ticket introuvable — il a peut-être été annulé entretemps'); return false; }
 
     if (!Array.isArray(ticket.items)) ticket.items = [];
-    ticket.items.push({ id: 'DEVIS-' + d.numero + '-' + Date.now(), name: 'Règlement devis ' + d.numero + ((d.client && d.client.nom) ? (' — ' + d.client.nom) : ''), price: montant, quantity: 1 });
+    const modeTxt = _devisPaymentModeLabel(mode, false);
+    ticket.items.push({ id: 'DEVIS-' + d.numero + '-' + Date.now(), name: 'Règlement devis ' + d.numero + ((d.client && d.client.nom) ? (' — ' + d.client.nom) : '') + ' (' + modeTxt + ')', price: montant, quantity: 1, paid: true, devisPaymentMode: mode });
     ticket.total = parseFloat(((parseFloat(ticket.total) || 0) + montant).toFixed(2));
     ticket.received = parseFloat(((parseFloat(ticket.received) || 0) + montant).toFixed(2));
     if (montantEspeces) ticket.receivedCash = parseFloat(((parseFloat(ticket.receivedCash) || 0) + montantEspeces).toFixed(2));
