@@ -271,6 +271,7 @@
     <button data-tab="gst-etiquettes" onclick="gstShowTab('gst-etiquettes')">&#127991;&#65039; &Eacute;tiquettes</button>
     <button data-tab="gst-tickets" onclick="gstShowTab('gst-tickets')">&#129534; Tickets oubli&eacute;s</button>
     <button data-tab="gst-devis" onclick="gstShowTab('gst-devis')">🧾 Devis / Factures</button>
+    <button data-tab="gst-bilan" onclick="gstShowTab('gst-bilan')">📊 Bilan</button>
 </div>
 
 
@@ -1394,6 +1395,81 @@
 </div>
 </div>
 
+<!-- ===================================================================== -->
+<!-- ===== ONGLET BILAN (récapitulatif mensuel) ============================ -->
+<div class="gst-panel" id="gst-bilan">
+<div style="padding:14px 18px;">
+    <div style="display:flex;align-items:center;gap:12px;margin-bottom:14px;padding-bottom:14px;border-bottom:1.5px solid var(--border-color,#eee);">
+        <div style="width:44px;height:44px;border-radius:12px;background:linear-gradient(135deg,#8e44ad,#5b2c6f);display:flex;align-items:center;justify-content:center;font-size:1.3rem;flex-shrink:0;box-shadow:0 4px 12px rgba(142,68,173,0.3);">📊</div>
+        <div>
+            <div style="font-weight:900;font-size:1.08rem;color:var(--text-main);letter-spacing:-0.2px;">Bilan mensuel</div>
+            <div style="font-size:0.78rem;color:var(--text-muted,#888);">Résultat financier, produits vendus et ventilation des paiements, mois par mois</div>
+        </div>
+    </div>
+
+    <div id="bilan-stats-row" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-bottom:16px;"></div>
+
+    <div class="ech-charts-row">
+        <div class="ech-chart-card">
+            <div class="ech-chart-title">📈 Résultat &amp; encaissements</div>
+            <div class="ech-chart-sub">12 derniers mois</div>
+            <div id="bilan-trend-chart" style="position:relative;"></div>
+        </div>
+        <div class="ech-chart-card">
+            <div class="ech-chart-title">📊 Ventilation des paiements</div>
+            <div class="ech-chart-sub">Cumul sur les mois listés ci-dessous</div>
+            <div id="bilan-payment-chart" style="position:relative;"></div>
+        </div>
+    </div>
+
+    <div style="font-size:0.72rem;color:var(--text-muted,#888);margin-bottom:8px;">💡 Cliquez sur un mois pour voir le détail des produits vendus.</div>
+    <div class="retours-table-wrap">
+        <table class="retours-table" id="bilan-table">
+            <thead><tr>
+                <th class="ech-th-sort ech-sort-active" onclick="window._bilanSortBy('mois')" data-col="mois">Mois<span class="ech-sort-arrow">▼</span></th>
+                <th class="ech-th-sort" onclick="window._bilanSortBy('marge')" data-col="marge">Résultat financier<span class="ech-sort-arrow">↕️</span></th>
+                <th class="ech-th-sort" onclick="window._bilanSortBy('especes')" data-col="especes">💶 Espèces<span class="ech-sort-arrow">↕️</span></th>
+                <th class="ech-th-sort" onclick="window._bilanSortBy('cb')" data-col="cb">💳 Carte bancaire<span class="ech-sort-arrow">↕️</span></th>
+                <th class="ech-th-sort" onclick="window._bilanSortBy('autres')" data-col="autres">Autres<span class="ech-sort-arrow">↕️</span></th>
+                <th class="ech-th-sort" onclick="window._bilanSortBy('encaisse')" data-col="encaisse">Total encaissé<span class="ech-sort-arrow">↕️</span></th>
+            </tr></thead>
+            <tbody id="bilan-tbody"></tbody>
+        </table>
+    </div>
+    <div id="bilan-empty" style="display:none;text-align:center;padding:40px;color:var(--text-muted,#7f8c8d);font-size:0.9rem;">
+        📊 Aucune vente enregistrée pour le moment.
+    </div>
+</div>
+</div>
+
+<!-- ===== Modale détail mensuel (bilan-detail-modal) ===== -->
+<div class="rm-overlay" id="bilan-detail-modal">
+    <div class="rm-modal" style="width:680px;">
+        <div class="rm-header">
+            <h3 id="bilan-detail-title">📊 Détail du mois</h3>
+            <button class="rm-close" onclick="closeRetourModal('bilan-detail-modal')">✕</button>
+        </div>
+        <div class="rm-body">
+            <div id="bilan-detail-stats" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;margin-bottom:18px;"></div>
+            <div style="font-weight:800;font-size:0.88rem;margin-bottom:8px;">📦 Produits vendus <span style="font-weight:400;font-size:0.72rem;color:var(--text-muted,#888);">(triés du plus vendu au moins vendu)</span></div>
+            <div class="retours-table-wrap">
+                <table class="retours-table" id="bilan-detail-table">
+                    <thead><tr><th>Produit</th><th>Quantité</th><th>Chiffre d'affaires</th><th>Marge estimée</th></tr></thead>
+                    <tbody id="bilan-detail-tbody"></tbody>
+                </table>
+            </div>
+            <div id="bilan-detail-cost-note" style="display:none;font-size:0.7rem;color:var(--text-muted,#888);margin-top:6px;">† Prix d'achat non renseigné pour cet article — marge estimée = chiffre d'affaires.</div>
+            <div id="bilan-detail-direct-wrap" style="display:none;margin-top:18px;">
+                <div style="font-weight:800;font-size:0.88rem;margin-bottom:8px;">🧾 Règlements de factures sans ticket</div>
+                <div id="bilan-detail-direct-list" style="display:flex;flex-direction:column;gap:6px;"></div>
+            </div>
+        </div>
+        <div class="rm-footer">
+            <button class="retours-btn retours-btn-outline" onclick="closeRetourModal('bilan-detail-modal')">Fermer</button>
+        </div>
+    </div>
+</div>
+
 <div role="dialog" aria-modal="true" id="devis-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.7);backdrop-filter:blur(8px);z-index:99800;justify-content:center;align-items:flex-start;overflow-y:auto;padding:20px 8px;">
   <div style="background:var(--bg-card,#fff);border-radius:16px;width:96%;max-width:820px;display:flex;flex-direction:column;overflow:hidden;box-shadow:0 24px 60px rgba(0,0,0,0.4);margin-bottom:20px;">
     <div style="background:linear-gradient(135deg,#2c6fad,#1b456b);padding:14px 20px;display:flex;align-items:center;justify-content:space-between;flex-shrink:0;">
@@ -1824,6 +1900,7 @@ function gstShowTab(id) {
     if (id === 'gst-config' && typeof gstConfigInit === 'function') gstConfigInit();
     if (id === 'gst-etiquettes' && typeof _lblInit === 'function') _lblInit();
     if (id === 'gst-devis' && typeof _devisInit === 'function') _devisInit();
+    if (id === 'gst-bilan' && typeof _bilanInit === 'function') _bilanInit();
 }
 
 function _gstRenderAll() {
@@ -8640,6 +8717,358 @@ window._devisGeneratePDF = function(id) {
     else showScanToast('Activez les popups pour générer le PDF', 'info');
 };
 
+// ═══════════════════════════════════════════════════════════════════════
+// ===== BILAN — récapitulatif mensuel =====================================
+// ═══════════════════════════════════════════════════════════════════════
+// Sources : covo_sales_history (tickets de caisse, y compris les lignes de
+// règlement de facture ajoutées à un ticket existant — déjà incluses
+// automatiquement) + covo_devis[].paiements avec ticketId===null (règlements
+// de factures "sans ticket", inclus explicitement à la demande de l'utilisateur).
+// Résultat financier = marge (chiffre d'affaires - prix d'achat courant des
+// articles, approximation : le prix d'achat au moment de la vente n'est pas
+// historisé, on utilise le prix d'achat ACTUEL du produit). Montant encaissé =
+// uniquement les composantes de paiement identifiables (espèces/CB/titre-repas
+// pour les tickets, espèces/CB pour les règlements directs) — un règlement en
+// mode Crédit/À compte est compté dans le résultat financier (revenu reconnu)
+// mais jamais dans l'encaissé (aucun mouvement de fonds réel), cohérent avec
+// covo_real_balance. Les retours article (type:'retour_article', total négatif)
+// réduisent le résultat financier et les quantités produits, mais n'affectent
+// pas l'encaissé faute de données de remboursement en espèces/CB dans le modèle.
+let _bilanSortState = {col:'mois', dir:'desc'};
+const _BILAN_MOIS_FR = ['Janvier','Février','Mars','Avril','Mai','Juin','Juillet','Août','Septembre','Octobre','Novembre','Décembre'];
+function _bilanKeyOf(dateStr) {
+    if (!dateStr) return null;
+    const d = new Date(dateStr);
+    if (isNaN(d.getTime())) return null;
+    return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0');
+}
+function _bilanLabelOf(key) {
+    const parts = key.split('-');
+    const y = parts[0], m = parseInt(parts[1],10)-1;
+    return (_BILAN_MOIS_FR[m]||'?') + ' ' + y;
+}
+function _bilanNewEntry(key) {
+    return { key, label:_bilanLabelOf(key), revenue:0, cogs:0, cash:0, cb:0, autres:0, ticketCount:0, productMap:{}, directSettlements:[] };
+}
+function _bilanCompute() {
+    const map = {};
+    const getEntry = key => { if (!map[key]) map[key] = _bilanNewEntry(key); return map[key]; };
+
+    // Tickets de caisse (ventes + retours + règlements de facture déjà rattachés à un ticket)
+    let sales = [];
+    try { sales = JSON.parse(localStorage.getItem('covo_sales_history') || '[]'); } catch(e) { sales = []; }
+    sales.forEach(sale => {
+        const key = _bilanKeyOf(sale.date);
+        if (!key) return;
+        const entry = getEntry(key);
+        const sign = sale.type === 'retour_article' ? -1 : 1;
+        entry.revenue += (parseFloat(sale.total)||0);
+        if (sign > 0) entry.ticketCount++;
+        entry.cash += (parseFloat(sale.receivedCash)||0);
+        entry.cb += (parseFloat(sale.receivedCB)||0);
+        entry.autres += (parseFloat(sale.receivedTicket)||0);
+        (sale.items||[]).forEach(item => {
+            const qty = (parseFloat(item.quantity)||0) * sign;
+            const lineRevenue = (parseFloat(item.price)||0) * (parseFloat(item.quantity)||0) * sign;
+            const prod = (typeof products !== 'undefined' ? products : []).find(p => p.id === item.id);
+            const cost = (prod && prod.costPrice != null && prod.costPrice !== '') ? parseFloat(prod.costPrice) : null;
+            const lineCost = cost != null ? cost * (parseFloat(item.quantity)||0) * sign : 0;
+            entry.cogs += lineCost;
+            const pname = item.name || 'Article';
+            const pkey = (item.id != null) ? ('id:'+item.id) : ('name:'+pname);
+            if (!entry.productMap[pkey]) entry.productMap[pkey] = { name:pname, qty:0, revenue:0, cost:0, hasCost:false, unitType:item.unitType||'unit' };
+            const pe = entry.productMap[pkey];
+            pe.qty += qty;
+            pe.revenue += lineRevenue;
+            pe.cost += lineCost;
+            if (cost != null) pe.hasCost = true;
+        });
+    });
+
+    // Règlements de factures "sans ticket" (covo_devis[].paiements, ticketId === null)
+    const devisAll = (typeof _devisGetAll === 'function') ? _devisGetAll() : [];
+    devisAll.forEach(d => {
+        (d.paiements||[]).forEach(p => {
+            if (p.ticketId !== null && p.ticketId !== undefined) return; // déjà compté via le ticket
+            const key = _bilanKeyOf(p.date);
+            if (!key) return;
+            const entry = getEntry(key);
+            entry.revenue += (parseFloat(p.montant)||0);
+            entry.cash += (parseFloat(p.montantEspeces)||0);
+            entry.cb += (parseFloat(p.montantCB)||0);
+            entry.directSettlements.push({
+                numero: d.numero || '—',
+                client: (d.client && d.client.nom) || '—',
+                montant: parseFloat(p.montant)||0,
+                mode: p.mode,
+                date: p.date
+            });
+        });
+    });
+
+    return Object.keys(map).map(key => {
+        const e = map[key];
+        e.margin = e.revenue - e.cogs;
+        e.encaisse = e.cash + e.cb + e.autres;
+        return e;
+    });
+}
+function _bilanSortValueOf(e, col) {
+    switch (col) {
+        case 'mois': return e.key;
+        case 'marge': return e.margin;
+        case 'especes': return e.cash;
+        case 'cb': return e.cb;
+        case 'autres': return e.autres;
+        case 'encaisse': return e.encaisse;
+        default: return 0;
+    }
+}
+function _bilanApplySort(list) {
+    const col = _bilanSortState.col, dir = _bilanSortState.dir;
+    const mult = dir === 'asc' ? 1 : -1;
+    return list.slice().sort((a,b) => {
+        const av = _bilanSortValueOf(a,col), bv = _bilanSortValueOf(b,col);
+        if (av<bv) return -1*mult;
+        if (av>bv) return 1*mult;
+        return 0;
+    });
+}
+window._bilanSortBy = function(col) {
+    if (_bilanSortState.col === col) { _bilanSortState.dir = _bilanSortState.dir==='asc'?'desc':'asc'; }
+    else { _bilanSortState.col = col; _bilanSortState.dir = 'desc'; }
+    _bilanRenderTable(_bilanApplySort(_bilanMonthsCache));
+    _bilanUpdateSortHeaders();
+};
+function _bilanUpdateSortHeaders() {
+    document.querySelectorAll('#bilan-table .ech-th-sort').forEach(th => {
+        const col = th.getAttribute('data-col');
+        const arrow = th.querySelector('.ech-sort-arrow');
+        if (col === _bilanSortState.col) {
+            th.classList.add('ech-sort-active');
+            if (arrow) arrow.textContent = _bilanSortState.dir==='asc' ? '▲' : '▼';
+        } else {
+            th.classList.remove('ech-sort-active');
+            if (arrow) arrow.textContent = '↕️';
+        }
+    });
+}
+
+let _bilanMonthsCache = [];
+
+function _bilanRenderStats(months) {
+    const host = document.getElementById('bilan-stats-row');
+    if (!host) return;
+    const totalMargin = months.reduce((s,e)=>s+e.margin,0);
+    const totalEncaisse = months.reduce((s,e)=>s+e.encaisse,0);
+    const totalCash = months.reduce((s,e)=>s+e.cash,0);
+    const totalCB = months.reduce((s,e)=>s+e.cb,0);
+    host.innerHTML = [
+        _devisStatCard('📊', _devisFmtEUR(totalMargin), 'Résultat cumulé', totalMargin>=0?'#27ae60':'#e74c3c'),
+        _devisStatCard('💰', _devisFmtEUR(totalEncaisse), 'Total encaissé', '#2c6fad'),
+        _devisStatCard('💶', _devisFmtEUR(totalCash), 'Espèces', '#8e44ad'),
+        _devisStatCard('💳', _devisFmtEUR(totalCB), 'Carte bancaire', '#e67e22'),
+        _devisStatCard('🗓️', months.length, 'Mois suivis', '#5d7a8c'),
+    ].join('');
+}
+
+function _bilanNiceScale(vals) {
+    const hi0 = Math.max(0, ...vals, 1);
+    const lo0 = Math.min(0, ...vals);
+    const hi = _echNiceMax(hi0);
+    const lo = lo0 < 0 ? -_echNiceMax(-lo0) : 0;
+    return {lo, hi};
+}
+function _bilanRenderTrendChart(months) {
+    const host = document.getElementById('bilan-trend-chart');
+    if (!host) return;
+    const chrono = months.slice().sort((a,b) => a.key<b.key?-1:a.key>b.key?1:0).slice(-12);
+    if (!chrono.length) { host.innerHTML = '<div style="padding:28px 0;text-align:center;color:var(--text-muted,#95a5a6);font-size:0.8rem;">Aucune donnée</div>'; return; }
+    const W=600, H=210, padL=42, padR=16, padT=16, padB=30;
+    const plotW=W-padL-padR, plotH=H-padT-padB;
+    const n = chrono.length;
+    const scale = _bilanNiceScale(chrono.map(e=>e.margin).concat(chrono.map(e=>e.encaisse)));
+    const xAt = i => padL + (n<=1?0:(plotW*i/(n-1)));
+    const yAt = v => padT + plotH - (plotH*(Math.max(scale.lo,Math.min(scale.hi,v))-scale.lo)/(scale.hi-scale.lo || 1));
+
+    const gridLines = [0,0.5,1].map(f => {
+        const y = padT + plotH - plotH*f;
+        const val = Math.round(scale.lo + (scale.hi-scale.lo)*f);
+        return '<line x1="'+padL+'" y1="'+y+'" x2="'+(W-padR)+'" y2="'+y+'" stroke="var(--border-color,#e0e0e0)" stroke-width="1"/>'
+             + '<text x="'+(padL-6)+'" y="'+(y+3)+'" text-anchor="end" font-size="9" fill="var(--text-muted,#95a5a6)">'+val+' €</text>';
+    }).join('');
+    let zeroLine = '';
+    if (scale.lo < 0 && scale.hi > 0) {
+        const y0 = yAt(0);
+        zeroLine = '<line x1="'+padL+'" y1="'+y0+'" x2="'+(W-padR)+'" y2="'+y0+'" stroke="var(--text-muted,#95a5a6)" stroke-width="1.2"/>';
+    }
+    const xLabels = chrono.map((e,i) => '<text x="'+xAt(i)+'" y="'+(H-8)+'" text-anchor="middle" font-size="9" fill="var(--text-muted,#95a5a6)">'+e.key.slice(2)+'</text>').join('');
+    const marginPts = chrono.map((e,i) => xAt(i)+','+yAt(e.margin)).join(' ');
+    const encaissePts = chrono.map((e,i) => xAt(i)+','+yAt(e.encaisse)).join(' ');
+    const lastI = n-1;
+
+    host.innerHTML =
+        '<svg viewBox="0 0 '+W+' '+H+'" style="width:100%;height:auto;display:block;overflow:visible;" id="bilan-trend-svg">'
+        + gridLines + zeroLine + xLabels
+        + '<polyline points="'+marginPts+'" fill="none" stroke="#2c6fad" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>'
+        + '<polyline points="'+encaissePts+'" fill="none" stroke="#e38737" stroke-width="2" stroke-dasharray="5,4" stroke-linejoin="round" stroke-linecap="round"/>'
+        + '<circle cx="'+xAt(lastI)+'" cy="'+yAt(chrono[lastI].margin)+'" r="5" fill="#2c6fad" stroke="var(--bg-card,#fff)" stroke-width="2"/>'
+        + '<circle cx="'+xAt(lastI)+'" cy="'+yAt(chrono[lastI].encaisse)+'" r="5" fill="#e38737" stroke="var(--bg-card,#fff)" stroke-width="2"/>'
+        + '<line id="bilan-trend-crosshair" x1="0" y1="'+padT+'" x2="0" y2="'+(padT+plotH)+'" stroke="var(--text-muted,#95a5a6)" stroke-width="1" opacity="0"/>'
+        + '<rect id="bilan-trend-hitrect" x="'+padL+'" y="'+padT+'" width="'+plotW+'" height="'+plotH+'" fill="transparent"/>'
+        + '</svg>'
+        + '<div class="ech-tooltip" id="bilan-trend-tooltip"></div>'
+        + '<div class="ech-legend">'
+        +   '<span class="ech-legend-item"><span class="ech-legend-line" style="border-color:#2c6fad;"></span>Résultat financier</span>'
+        +   '<span class="ech-legend-item"><span class="ech-legend-line dashed" style="border-color:#e38737;"></span>Total encaissé</span>'
+        + '</div>';
+
+    const svgEl = document.getElementById('bilan-trend-svg');
+    const hit = document.getElementById('bilan-trend-hitrect');
+    const crosshair = document.getElementById('bilan-trend-crosshair');
+    const tooltip = document.getElementById('bilan-trend-tooltip');
+    if (hit && svgEl && tooltip && crosshair) {
+        const showAt = (clientX) => {
+            const rect = svgEl.getBoundingClientRect();
+            const scaleX = W/rect.width;
+            const localX = (clientX-rect.left)*scaleX;
+            let idx=0, best=Infinity;
+            chrono.forEach((e,i)=>{ const dx=Math.abs(xAt(i)-localX); if(dx<best){best=dx;idx=i;} });
+            const bx = xAt(idx);
+            crosshair.setAttribute('x1', bx); crosshair.setAttribute('x2', bx); crosshair.setAttribute('opacity','1');
+            const e = chrono[idx];
+            tooltip.innerHTML = '<strong>'+_esc(e.label)+'</strong><br>'
+                + '<span style="color:#7fb2e0;">●</span> Résultat : <strong>'+_devisFmtEUR(e.margin)+'</strong><br>'
+                + '<span style="color:#f0b876;">●</span> Encaissé : <strong>'+_devisFmtEUR(e.encaisse)+'</strong>';
+            const px = (bx/W)*rect.width;
+            tooltip.style.left = Math.min(Math.max(px-45,0), Math.max(rect.width-150,0)) + 'px';
+            tooltip.style.top = '4px';
+            tooltip.classList.add('show');
+        };
+        hit.addEventListener('pointermove', e => showAt(e.clientX));
+        hit.addEventListener('pointerleave', () => { crosshair.setAttribute('opacity','0'); tooltip.classList.remove('show'); });
+    }
+}
+
+function _bilanRenderPaymentChart(months) {
+    const host = document.getElementById('bilan-payment-chart');
+    if (!host) return;
+    const cash = months.reduce((s,e)=>s+e.cash,0);
+    const cb = months.reduce((s,e)=>s+e.cb,0);
+    const autres = months.reduce((s,e)=>s+e.autres,0);
+    const total = cash+cb+autres;
+    if (total <= 0) { host.innerHTML = '<div style="padding:28px 0;text-align:center;color:var(--text-muted,#95a5a6);font-size:0.8rem;">Aucun encaissement</div>'; return; }
+    const segs = [
+        {label:'Espèces', color:'#2c6fad', icon:'💶', val:cash},
+        {label:'Carte bancaire', color:'#e38737', icon:'💳', val:cb},
+        {label:'Autres', color:'#95a5a6', icon:'🎫', val:autres},
+    ];
+    const track = segs.filter(s=>s.val>0).map(s => {
+        const pct = (s.val/total*100);
+        return '<div class="ech-status-bar-seg" style="width:'+pct+'%;background:'+s.color+';" title="'+s.label+' : '+_devisFmtEUR(s.val)+' ('+pct.toFixed(0)+'%)"></div>';
+    }).join('');
+    const legend = segs.map(s => {
+        const pct = (s.val/total*100).toFixed(0);
+        return '<span class="ech-legend-item"><span class="ech-legend-swatch" style="background:'+s.color+';"></span>'+s.icon+' '+s.label+' : <strong style="color:var(--text-main,#2c3e50);">'+_devisFmtEUR(s.val)+'</strong> ('+pct+'%)</span>';
+    }).join('');
+    host.innerHTML = '<div class="ech-status-bar-track">'+track+'</div><div class="ech-legend" style="margin-top:10px;">'+legend+'</div>';
+}
+
+function _bilanRenderTable(months) {
+    const tbody = document.getElementById('bilan-tbody');
+    const emptyEl = document.getElementById('bilan-empty');
+    if (!tbody) return;
+    if (!months.length) {
+        tbody.innerHTML = '';
+        if (emptyEl) emptyEl.style.display = 'block';
+        return;
+    }
+    if (emptyEl) emptyEl.style.display = 'none';
+    tbody.innerHTML = months.map(e => {
+        const margeColor = e.margin >= 0 ? '#27ae60' : '#e74c3c';
+        return '<tr style="cursor:pointer;" onclick="_bilanOpenDetail(\''+e.key+'\')">'
+            + '<td><strong style="font-size:0.87rem;">'+_esc(e.label)+'</strong></td>'
+            + '<td><strong style="color:'+margeColor+';font-size:0.88rem;">'+_devisFmtEUR(e.margin)+'</strong></td>'
+            + '<td style="font-size:0.82rem;">'+_devisFmtEUR(e.cash)+'</td>'
+            + '<td style="font-size:0.82rem;">'+_devisFmtEUR(e.cb)+'</td>'
+            + '<td style="font-size:0.82rem;color:var(--text-muted,#888);">'+_devisFmtEUR(e.autres)+'</td>'
+            + '<td><strong style="font-size:0.88rem;">'+_devisFmtEUR(e.encaisse)+'</strong></td>'
+            + '</tr>';
+    }).join('');
+    _bilanUpdateSortHeaders();
+}
+
+window._bilanOpenDetail = function(key) {
+    const entry = _bilanMonthsCache.find(e => e.key === key);
+    if (!entry) return;
+    const titleEl = document.getElementById('bilan-detail-title');
+    if (titleEl) titleEl.textContent = '📊 ' + entry.label;
+
+    const statsHost = document.getElementById('bilan-detail-stats');
+    if (statsHost) {
+        statsHost.innerHTML = [
+            _devisStatCard('💼', _devisFmtEUR(entry.revenue), 'Chiffre d\'affaires', '#2c6fad'),
+            _devisStatCard('📊', _devisFmtEUR(entry.margin), 'Résultat financier', entry.margin>=0?'#27ae60':'#e74c3c'),
+            _devisStatCard('💰', _devisFmtEUR(entry.encaisse), 'Total encaissé', '#8e44ad'),
+            _devisStatCard('📦', Object.keys(entry.productMap).length, 'Produits distincts', '#5d7a8c'),
+        ].join('');
+    }
+
+    const rows = Object.values(entry.productMap)
+        .filter(p => Math.abs(p.qty) > 0.0001 || Math.abs(p.revenue) > 0.001)
+        .sort((a,b) => b.qty - a.qty);
+    const tbody = document.getElementById('bilan-detail-tbody');
+    let anyMissingCost = false;
+    if (tbody) {
+        if (!rows.length) {
+            tbody.innerHTML = '<tr><td colspan="4" style="text-align:center;padding:20px;color:var(--text-muted,#888);">Aucun produit vendu ce mois-ci.</td></tr>';
+        } else {
+            tbody.innerHTML = rows.map(p => {
+                const qtyLabel = p.unitType==='kg' ? p.qty.toFixed(3)+' kg' : p.qty.toFixed(p.qty%1===0?0:2);
+                const margeVal = p.hasCost ? (p.revenue - p.cost) : p.revenue;
+                if (!p.hasCost) anyMissingCost = true;
+                return '<tr>'
+                    + '<td><strong style="font-size:0.85rem;">'+_esc(p.name)+'</strong>'+(!p.hasCost?' <span style="color:#e67e22;">†</span>':'')+'</td>'
+                    + '<td style="font-size:0.84rem;">'+qtyLabel+'</td>'
+                    + '<td style="font-size:0.84rem;">'+_devisFmtEUR(p.revenue)+'</td>'
+                    + '<td style="font-size:0.84rem;color:'+(margeVal>=0?'#27ae60':'#e74c3c')+';">'+_devisFmtEUR(margeVal)+'</td>'
+                    + '</tr>';
+            }).join('');
+        }
+    }
+    const costNote = document.getElementById('bilan-detail-cost-note');
+    if (costNote) costNote.style.display = anyMissingCost ? 'block' : 'none';
+
+    const directWrap = document.getElementById('bilan-detail-direct-wrap');
+    const directList = document.getElementById('bilan-detail-direct-list');
+    if (directWrap && directList) {
+        if (entry.directSettlements.length) {
+            directList.innerHTML = entry.directSettlements.map(s => {
+                const modeTxt = (typeof _devisPaymentModeLabel === 'function') ? _devisPaymentModeLabel(s.mode, true) : s.mode;
+                const dateTxt = s.date ? new Date(s.date).toLocaleDateString('fr-FR') : '—';
+                return '<div style="display:flex;align-items:center;justify-content:space-between;gap:10px;padding:8px 12px;background:var(--bg-card-2,#f4f6f9);border-radius:8px;font-size:0.82rem;">'
+                    + '<span>🧾 <strong>'+_esc(s.numero)+'</strong> — '+_esc(s.client)+' <span style="color:var(--text-muted,#888);">('+dateTxt+')</span></span>'
+                    + '<span><strong>'+_devisFmtEUR(s.montant)+'</strong> <span style="color:var(--text-muted,#888);">'+_esc(modeTxt)+'</span></span>'
+                    + '</div>';
+            }).join('');
+            directWrap.style.display = 'block';
+        } else {
+            directWrap.style.display = 'none';
+        }
+    }
+
+    openRetourModal('bilan-detail-modal');
+};
+
+function _bilanInit() {
+    _bilanMonthsCache = _bilanCompute();
+    const sorted = _bilanApplySort(_bilanMonthsCache);
+    _bilanRenderStats(_bilanMonthsCache);
+    _bilanRenderTrendChart(_bilanMonthsCache);
+    _bilanRenderPaymentChart(_bilanMonthsCache);
+    _bilanRenderTable(sorted);
+}
+
 // ── Initialisation ────────────────────────────────────────────────────────
 
 // ── Initialisation ────────────────────────────────────────────────────────
@@ -8650,6 +9079,7 @@ window._devisGeneratePDF = function(id) {
         if (e.key === 'covo_current_user') cpRefreshUserBadge();
         if (['covo_products','covo_categories','covo_promos','covo_users','covo_sales_history','covo_settings','covo_ech_categories'].indexOf(e.key) !== -1) _gstRenderAll();
         if (e.key === 'covo_devis') { var _dp = document.getElementById('gst-devis'); if (_dp && _dp.classList.contains('active') && typeof _devisRenderList === 'function') _devisRenderList(); }
+        if (['covo_sales_history','covo_devis','covo_products'].indexOf(e.key) !== -1) { var _bp = document.getElementById('gst-bilan'); if (_bp && _bp.classList.contains('active') && typeof _bilanInit === 'function') _bilanInit(); }
     });
     var savedClientId = localStorage.getItem('gdrive_client_id');
     if (savedClientId) { var inp = document.getElementById('cp-gdrive-client-id'); if (inp) inp.value = savedClientId; }
