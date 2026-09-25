@@ -116,11 +116,36 @@
     .rbadge-ok { background:rgba(46,204,113,0.15); color:#27ae60; border:1px solid rgba(46,204,113,0.3); }
     .rbadge-expired { background:rgba(231,76,60,0.15); color:#e74c3c; border:1px solid rgba(231,76,60,0.3); }
     .rbadge-urgent { background:rgba(230,126,34,0.15); color:#e67e22; border:1px solid rgba(230,126,34,0.3); }
+    .rbadge-soon { background:rgba(196,154,0,0.15); color:#c49a00; border:1px solid rgba(196,154,0,0.3); }
     .rdate-chip { display:inline-flex; align-items:center; gap:4px; padding:3px 8px; border-radius:6px; font-size:0.77rem; font-weight:500; }
     .rdate-chip.expired { background:rgba(231,76,60,0.1); color:#e74c3c; }
     .rdate-chip.urgent { background:rgba(230,126,34,0.1); color:#e67e22; }
     .rdate-chip.soon { background:rgba(241,196,15,0.1); color:#c49a00; }
     .rdate-chip.ok { background:rgba(46,204,113,0.1); color:#27ae60; }
+
+    /* ===== Échéances — KPI, graphiques, tableau trié ===== */
+    .ech-stats-row { display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:10px; margin:14px 0; }
+    .ech-charts-row { display:grid; grid-template-columns:1.4fr 1fr; gap:14px; margin:0 0 18px; }
+    @media (max-width:900px) { .ech-charts-row { grid-template-columns:1fr; } }
+    .ech-chart-card { background:var(--bg-card,#fff); border:1.5px solid var(--border-color,#e0e0e0); border-radius:12px; padding:14px 16px 10px; position:relative; }
+    .ech-chart-title { font-size:0.82rem; font-weight:700; color:var(--text-main,#2c3e50); margin:0 0 2px; display:flex; align-items:center; gap:6px; }
+    .ech-chart-sub { font-size:0.71rem; color:var(--text-muted,#7f8c8d); margin:0 0 8px; }
+    .ech-legend { display:flex; flex-wrap:wrap; gap:10px; font-size:0.72rem; color:var(--text-muted,#7f8c8d); margin-top:6px; }
+    .ech-legend-item { display:inline-flex; align-items:center; gap:5px; }
+    .ech-legend-swatch { width:11px; height:11px; border-radius:3px; flex-shrink:0; }
+    .ech-legend-line { width:14px; height:0; border-top:2.5px solid; flex-shrink:0; }
+    .ech-legend-line.dashed { border-top-style:dashed; }
+    .ech-tooltip { position:absolute; pointer-events:none; background:#1f2d3a; color:#fff; font-size:0.71rem; line-height:1.5; padding:7px 10px; border-radius:7px; box-shadow:0 6px 18px rgba(0,0,0,0.25); z-index:20; opacity:0; transition:opacity 0.1s; white-space:nowrap; }
+    .ech-tooltip.show { opacity:1; }
+    .ech-tooltip strong { font-weight:700; }
+    .ech-th-sort { cursor:pointer; user-select:none; position:relative; }
+    .ech-th-sort:hover { color:var(--text-main,#2c3e50); }
+    .ech-th-sort .ech-sort-arrow { display:inline-block; margin-left:4px; font-size:0.68rem; opacity:0.55; }
+    .ech-th-sort.ech-sort-active .ech-sort-arrow { opacity:1; color:#2c6fad; }
+    .ech-status-bar-track { display:flex; width:100%; height:22px; border-radius:6px; overflow:hidden; background:var(--bg-card-2,#f0f2f5); }
+    .ech-status-bar-seg { height:100%; transition:filter 0.12s; cursor:pointer; box-sizing:border-box; border-right:2px solid var(--bg-card,#fff); }
+    .ech-status-bar-seg:last-child { border-right:none; }
+    .ech-status-bar-seg:hover { filter:brightness(1.08); }
     .rm-overlay { display:none; position:fixed; inset:0; background:rgba(0,0,0,0.55); z-index:3000; align-items:center; justify-content:center; backdrop-filter:blur(2px); }
     .rm-overlay.open { display:flex; }
     .rm-modal { background:var(--bg-card,#fff); color:var(--text-main,#2c3e50); border-radius:12px; width:560px; max-width:95vw; max-height:88vh; overflow-y:auto; box-shadow:0 20px 60px rgba(0,0,0,0.25); }
@@ -906,18 +931,40 @@
             <select class="retours-filter-sel" id="ech-cat-filter" onchange="filterEcheancesByCat(this.value)">
                 <option value="">Toutes catégories</option>
             </select>
-            <select class="retours-filter-sel" id="ech-sort-filter" onchange="filterEcheancesBySort(this.value)" title="Trier par délai / DLC">
-                <option value="">↕️ Tri par défaut</option>
-                <option value="asc">⏱️ Délai : du plus petit au plus grand</option>
-                <option value="desc">⏱️ Délai : du plus grand au plus petit</option>
-            </select>
             <button class="retours-btn retours-btn-success" onclick="openRetourModal('rm-echeance')">➕ Ajouter article</button>
             <button class="retours-btn" style="background:#1565c0;color:#fff;" title="Ajouter automatiquement tous les produits du catalogue" onclick="window._echImportAllProducts&&window._echImportAllProducts()">📥 Importer tous les produits</button>
             <button class="retours-btn retours-btn-outline" onclick="exportEcheances()">⬇️ CSV</button>
         </div>
     </div>
+
+    <!-- ===== KPI échéances ===== -->
+    <div class="ech-stats-row" id="ech-stats-row"></div>
+
+    <!-- ===== Graphiques échéances ===== -->
+    <div class="ech-charts-row">
+        <div class="ech-chart-card">
+            <div class="ech-chart-title">📈 Tendance des expirations</div>
+            <div class="ech-chart-sub">Nouvelles échéances par semaine (8 prochaines semaines) &amp; cumul</div>
+            <div id="ech-trend-chart" style="position:relative;"></div>
+        </div>
+        <div class="ech-chart-card">
+            <div class="ech-chart-title">📊 Répartition par état</div>
+            <div class="ech-chart-sub">Sur les articles filtrés</div>
+            <div id="ech-status-chart" style="position:relative;"></div>
+        </div>
+    </div>
+
     <div class="retours-table-wrap"><table class="retours-table">
-        <thead><tr><th>Article</th><th>Référence</th><th>Catégorie</th><th>DLC / DLUO</th><th>Délai restant</th><th>Stock</th><th>Emplacement</th><th>État</th></tr></thead>
+        <thead><tr>
+            <th class="ech-th-sort" onclick="window._echSortBy('article')" data-col="article">Article<span class="ech-sort-arrow">↕️</span></th>
+            <th class="ech-th-sort" onclick="window._echSortBy('ref')" data-col="ref">Référence<span class="ech-sort-arrow">↕️</span></th>
+            <th class="ech-th-sort" onclick="window._echSortBy('categorie')" data-col="categorie">Catégorie<span class="ech-sort-arrow">↕️</span></th>
+            <th class="ech-th-sort" onclick="window._echSortBy('date')" data-col="date">DLC / DLUO<span class="ech-sort-arrow">↕️</span></th>
+            <th class="ech-th-sort ech-sort-active" onclick="window._echSortBy('delai')" data-col="delai">Délai restant<span class="ech-sort-arrow">▲</span></th>
+            <th class="ech-th-sort" onclick="window._echSortBy('stock')" data-col="stock">Stock<span class="ech-sort-arrow">↕️</span></th>
+            <th class="ech-th-sort" onclick="window._echSortBy('emplacement')" data-col="emplacement">Emplacement<span class="ech-sort-arrow">↕️</span></th>
+            <th>État</th>
+        </tr></thead>
         <tbody id="echeances-tbody"></tbody>
     </table></div>
 
@@ -5101,11 +5148,205 @@ function addRetourHist(t2, t1, titre, desc) {
     rSave('hist', h);
 }
 
-let eft='', efs='', efc='', efSort='';
+let eft='', efs='', efc='';
 function filterEcheances(t) { eft=t.toLowerCase(); applyEchFilter(); }
 function filterEcheancesByStatus(s) { efs=s; applyEchFilter(); }
 function filterEcheancesByCat(c) { efc=c; applyEchFilter(); }
-function filterEcheancesBySort(v) { efSort=v; applyEchFilter(); }
+
+/* ===== Échéances — tri interactif du tableau (classement automatique) ===== */
+let _echSortState = {col:'delai', dir:'asc'};
+function _echDelaiOf(e) {
+    if (!e.date) return Infinity;
+    const today = new Date(); today.setHours(0,0,0,0);
+    const dd = new Date(e.date); dd.setHours(0,0,0,0);
+    if (isNaN(dd.getTime())) return Infinity;
+    return Math.ceil((dd-today)/86400000);
+}
+function _echApplySort(list) {
+    const col = _echSortState.col, dir = _echSortState.dir;
+    const mult = dir === 'asc' ? 1 : -1;
+    return list.slice().sort((a,b) => {
+        let av, bv;
+        if (col === 'delai') { av=_echDelaiOf(a); bv=_echDelaiOf(b); }
+        else if (col === 'stock') { av=parseFloat(a.stock)||0; bv=parseFloat(b.stock)||0; }
+        else if (col === 'date') { av=a.date||''; bv=b.date||''; }
+        else { av=(a[col]||'').toString().toLowerCase(); bv=(b[col]||'').toString().toLowerCase(); }
+        if (av<bv) return -1*mult;
+        if (av>bv) return 1*mult;
+        return 0;
+    });
+}
+window._echSortBy = function(col) {
+    if (_echSortState.col === col) { _echSortState.dir = _echSortState.dir==='asc'?'desc':'asc'; }
+    else { _echSortState.col = col; _echSortState.dir = 'asc'; }
+    applyEchFilter();
+};
+function _echUpdateSortHeaders() {
+    document.querySelectorAll('.ech-th-sort').forEach(th => {
+        const col = th.getAttribute('data-col');
+        const arrow = th.querySelector('.ech-sort-arrow');
+        if (col === _echSortState.col) {
+            th.classList.add('ech-sort-active');
+            if (arrow) arrow.textContent = _echSortState.dir==='asc' ? '▲' : '▼';
+        } else {
+            th.classList.remove('ech-sort-active');
+            if (arrow) arrow.textContent = '↕️';
+        }
+    });
+}
+
+/* ===== Échéances — KPI (stat tiles, réutilise _devisStatCard) ===== */
+function _echRenderStats(d) {
+    const host = document.getElementById('ech-stats-row');
+    if (!host) return;
+    const today = new Date(); today.setHours(0,0,0,0);
+    let expired=0, urgent=0, soon=0, ok=0;
+    d.forEach(e => {
+        if (!e.date || isNaN(new Date(e.date).getTime())) return;
+        const dd = new Date(e.date); dd.setHours(0,0,0,0);
+        const diff = Math.ceil((dd-today)/86400000);
+        if (diff<0) expired++;
+        else if (diff<=3) urgent++;
+        else if (diff<=7) soon++;
+        else ok++;
+    });
+    host.innerHTML = [
+        _devisStatCard('📦', d.length, 'Articles suivis', '#2c6fad'),
+        _devisStatCard('🔴', expired, 'Expirés', '#e74c3c'),
+        _devisStatCard('🟠', urgent, 'Urgent (≤3j)', '#e67e22'),
+        _devisStatCard('🟡', soon, 'Bientôt (≤7j)', '#c49a00'),
+        _devisStatCard('🟢', ok, 'OK', '#27ae60'),
+    ].join('');
+}
+
+/* ===== Échéances — graphique de tendance (SVG, 8 semaines) ===== */
+function _echTrendData(d) {
+    const today = new Date(); today.setHours(0,0,0,0);
+    const weeks = 8;
+    const buckets = [];
+    for (let i=0;i<weeks;i++) buckets.push({label:'S+'+(i+1), start:i*7, end:i*7+6, count:0});
+    d.forEach(e => {
+        if (!e.date) return;
+        const dd = new Date(e.date); dd.setHours(0,0,0,0);
+        if (isNaN(dd.getTime())) return;
+        const diff = Math.ceil((dd-today)/86400000);
+        if (diff < 0) return;
+        const wi = Math.floor(diff/7);
+        if (wi>=0 && wi<weeks) buckets[wi].count++;
+    });
+    let cum = 0;
+    buckets.forEach(b => { cum += b.count; b.cum = cum; });
+    return buckets;
+}
+function _echNiceMax(v) {
+    if (v<=0) return 4;
+    const mag = Math.pow(10, Math.floor(Math.log10(v)));
+    const norm = v/mag;
+    let step = norm<=1?1:norm<=2?2:norm<=5?5:10;
+    return step*mag;
+}
+function _echRenderTrendChart(buckets) {
+    const host = document.getElementById('ech-trend-chart');
+    if (!host) return;
+    const W=600, H=210, padL=34, padR=16, padT=16, padB=28;
+    const plotW=W-padL-padR, plotH=H-padT-padB;
+    const n = buckets.length;
+    const maxVal = Math.max(1, ...buckets.map(b=>b.count), ...buckets.map(b=>b.cum));
+    const niceMax = _echNiceMax(maxVal);
+    const xAt = i => padL + (n<=1?0:(plotW*i/(n-1)));
+    const yAt = v => padT + plotH - (plotH*Math.min(v,niceMax)/niceMax);
+
+    const gridLines = [0,0.5,1].map(f => {
+        const y = padT + plotH - plotH*f;
+        const val = Math.round(niceMax*f);
+        return '<line x1="'+padL+'" y1="'+y+'" x2="'+(W-padR)+'" y2="'+y+'" stroke="var(--border-color,#e0e0e0)" stroke-width="1"/>'
+             + '<text x="'+(padL-6)+'" y="'+(y+3)+'" text-anchor="end" font-size="9" fill="var(--text-muted,#95a5a6)">'+val+'</text>';
+    }).join('');
+    const xLabels = buckets.map((b,i)=>'<text x="'+xAt(i)+'" y="'+(H-8)+'" text-anchor="middle" font-size="9" fill="var(--text-muted,#95a5a6)">'+b.label+'</text>').join('');
+    const countPts = buckets.map((b,i)=>xAt(i)+','+yAt(b.count)).join(' ');
+    const cumPts = buckets.map((b,i)=>xAt(i)+','+yAt(b.cum)).join(' ');
+    const lastI = n-1;
+    const countEnd = buckets[lastI].count, cumEnd = buckets[lastI].cum;
+
+    host.innerHTML =
+        '<svg viewBox="0 0 '+W+' '+H+'" style="width:100%;height:auto;display:block;overflow:visible;" id="ech-trend-svg">'
+        + gridLines + xLabels
+        + '<polyline points="'+countPts+'" fill="none" stroke="#2c6fad" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>'
+        + '<polyline points="'+cumPts+'" fill="none" stroke="#e38737" stroke-width="2" stroke-dasharray="5,4" stroke-linejoin="round" stroke-linecap="round"/>'
+        + '<circle cx="'+xAt(lastI)+'" cy="'+yAt(countEnd)+'" r="5" fill="#2c6fad" stroke="var(--bg-card,#fff)" stroke-width="2"/>'
+        + '<circle cx="'+xAt(lastI)+'" cy="'+yAt(cumEnd)+'" r="5" fill="#e38737" stroke="var(--bg-card,#fff)" stroke-width="2"/>'
+        + '<text x="'+(xAt(lastI)+8)+'" y="'+(yAt(countEnd)+3)+'" font-size="10" font-weight="700" fill="var(--text-main,#2c3e50)">'+countEnd+'</text>'
+        + '<text x="'+(xAt(lastI)+8)+'" y="'+(yAt(cumEnd)+3)+'" font-size="10" font-weight="700" fill="var(--text-main,#2c3e50)">'+cumEnd+'</text>'
+        + '<line id="ech-trend-crosshair" x1="0" y1="'+padT+'" x2="0" y2="'+(padT+plotH)+'" stroke="var(--text-muted,#95a5a6)" stroke-width="1" opacity="0"/>'
+        + '<rect id="ech-trend-hitrect" x="'+padL+'" y="'+padT+'" width="'+plotW+'" height="'+plotH+'" fill="transparent"/>'
+        + '</svg>'
+        + '<div class="ech-tooltip" id="ech-trend-tooltip"></div>'
+        + '<div class="ech-legend">'
+        +   '<span class="ech-legend-item"><span class="ech-legend-line" style="border-color:#2c6fad;"></span>Nouvelles échéances / semaine</span>'
+        +   '<span class="ech-legend-item"><span class="ech-legend-line dashed" style="border-color:#e38737;"></span>Cumul</span>'
+        + '</div>';
+
+    const svgEl = document.getElementById('ech-trend-svg');
+    const hit = document.getElementById('ech-trend-hitrect');
+    const crosshair = document.getElementById('ech-trend-crosshair');
+    const tooltip = document.getElementById('ech-trend-tooltip');
+    if (hit && svgEl && tooltip && crosshair) {
+        const showAt = (clientX) => {
+            const rect = svgEl.getBoundingClientRect();
+            const scaleX = W/rect.width;
+            const localX = (clientX-rect.left)*scaleX;
+            let idx=0, best=Infinity;
+            buckets.forEach((b,i)=>{ const dx=Math.abs(xAt(i)-localX); if(dx<best){best=dx;idx=i;} });
+            const bx = xAt(idx);
+            crosshair.setAttribute('x1', bx); crosshair.setAttribute('x2', bx); crosshair.setAttribute('opacity','1');
+            const b = buckets[idx];
+            tooltip.innerHTML = '<strong>'+_esc(b.label)+'</strong> ('+(b.start+1)+'-'+(b.end+1)+'j)<br>'
+                + '<span style="color:#7fb2e0;">●</span> Nouvelles : <strong>'+b.count+'</strong><br>'
+                + '<span style="color:#f0b876;">●</span> Cumul : <strong>'+b.cum+'</strong>';
+            const px = (bx/W)*rect.width;
+            tooltip.style.left = Math.min(Math.max(px-40,0), Math.max(rect.width-140,0)) + 'px';
+            tooltip.style.top = '4px';
+            tooltip.classList.add('show');
+        };
+        hit.addEventListener('pointermove', e => showAt(e.clientX));
+        hit.addEventListener('pointerleave', () => { crosshair.setAttribute('opacity','0'); tooltip.classList.remove('show'); });
+    }
+}
+
+/* ===== Échéances — répartition par état (barre empilée horizontale) ===== */
+function _echRenderStatusBar(d) {
+    const host = document.getElementById('ech-status-chart');
+    if (!host) return;
+    const today = new Date(); today.setHours(0,0,0,0);
+    const b = {expired:0, urgent:0, soon:0, ok:0, undated:0};
+    d.forEach(e => {
+        if (!e.date || isNaN(new Date(e.date).getTime())) { b.undated++; return; }
+        const dd = new Date(e.date); dd.setHours(0,0,0,0);
+        const diff = Math.ceil((dd-today)/86400000);
+        if (diff<0) b.expired++;
+        else if (diff<=3) b.urgent++;
+        else if (diff<=7) b.soon++;
+        else b.ok++;
+    });
+    const total = d.length || 1;
+    const segs = [
+        {label:'Expiré', color:'#e74c3c', icon:'🔴', count:b.expired},
+        {label:'Urgent (≤3j)', color:'#e67e22', icon:'🟠', count:b.urgent},
+        {label:'Bientôt (≤7j)', color:'#c49a00', icon:'🟡', count:b.soon},
+        {label:'OK', color:'#27ae60', icon:'🟢', count:b.ok},
+    ];
+    if (b.undated>0) segs.push({label:'DLC à définir', color:'#95a5a6', icon:'⚪', count:b.undated});
+
+    const track = segs.filter(s=>s.count>0).map(s => {
+        const pct = (s.count/total*100);
+        return '<div class="ech-status-bar-seg" style="width:'+pct+'%;background:'+s.color+';" title="'+s.label+' : '+s.count+' ('+pct.toFixed(0)+'%)"></div>';
+    }).join('');
+    const legend = segs.map(s => {
+        const pct = (s.count/total*100).toFixed(0);
+        return '<span class="ech-legend-item"><span class="ech-legend-swatch" style="background:'+s.color+';"></span>'+s.icon+' '+s.label+' : <strong style="color:var(--text-main,#2c3e50);">'+s.count+'</strong> ('+pct+'%)</span>';
+    }).join('');
+    host.innerHTML = '<div class="ech-status-bar-track">'+track+'</div><div class="ech-legend" style="margin-top:10px;">'+legend+'</div>';
+}
 
 function _echImportAllProducts(opts){
   opts = opts || {};
@@ -5158,12 +5399,12 @@ function applyEchFilter() {
             return true;
         });
     }
-    if (efSort) {
-        const today = new Date(); today.setHours(0,0,0,0);
-        const dl = e => { if(!e.date) return Infinity; const dd=new Date(e.date); dd.setHours(0,0,0,0); return Math.ceil((dd-today)/86400000); };
-        d = d.slice().sort((a,b) => efSort === 'asc' ? dl(a)-dl(b) : dl(b)-dl(a));
-    }
+    d = _echApplySort(d);
     renderEcheances(d);
+    _echRenderStats(d);
+    _echRenderTrendChart(_echTrendData(d));
+    _echRenderStatusBar(d);
+    _echUpdateSortHeaders();
 }
 
 function renderEcheances(data) {
@@ -5189,7 +5430,7 @@ function renderEcheances(data) {
         let sc,sl;
         if (diff<0) { sc='rbadge-expired';sl='Expiré'; }
         else if (diff<=3) { sc='rbadge-urgent';sl='Urgent'; }
-        else if (diff<=7) { sc='rbadge-urgent';sl='Bientôt'; }
+        else if (diff<=7) { sc='rbadge-soon';sl='Bientôt'; }
         else { sc='rbadge-ok';sl='OK'; }
         const cc = diff<0?'expired':diff<=3?'urgent':diff<=7?'soon':'ok';
         const dt = diff<0?`Expiré il y a ${Math.abs(diff)}j`:diff===0?'Expire auj.':diff+'j restants';
