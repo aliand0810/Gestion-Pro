@@ -278,8 +278,6 @@
 <!-- ===== ONGLET PRODUITS & CATALOGUE (repris de COVO Pro) ================ -->
 <div class="gst-panel active" id="gst-produits">
 <div class="retours-tab-panel" id="rt-catalogue" style="padding:14px 18px;">
-    <div id="cat-stats-row" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px;margin-bottom:16px;"></div>
-
     <div class="retours-toolbar">
         <div class="retours-toolbar-row">
             <div class="retours-search-box">
@@ -305,6 +303,21 @@
             </select>
             <button class="retours-btn retours-btn-success" onclick="openCatalogueAddModal()">➕ Ajouter un produit</button>
             <button class="retours-btn retours-btn-outline" onclick="exportCatalogue()">⬇️ Exporter CSV</button>
+        </div>
+    </div>
+
+    <div id="cat-stats-row" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;margin:14px 0;"></div>
+
+    <div class="ech-charts-row">
+        <div class="ech-chart-card">
+            <div class="ech-chart-title">📈 Valeur du stock par catégorie</div>
+            <div class="ech-chart-sub">Top catégories triées par valeur &amp; part cumulée</div>
+            <div id="cat-value-chart" style="position:relative;"></div>
+        </div>
+        <div class="ech-chart-card">
+            <div class="ech-chart-title">📊 État du stock</div>
+            <div class="ech-chart-sub">Sur les articles filtrés</div>
+            <div id="cat-status-chart" style="position:relative;"></div>
         </div>
     </div>
 
@@ -352,15 +365,15 @@
                     <th class="cat-checkbox-col"><input type="checkbox" id="cat-select-all" title="Tout sélectionner" onchange="catSelectAll(this.checked)"></th>
                     <th style="width:36px;text-align:center;font-size:0.72rem;color:#8899aa;letter-spacing:0.04em;">N°</th>
                     <th style="width:48px;">Image</th>
-                    <th>Nom</th>
-                    <th>Catégorie</th>
-                    <th>Prix</th>
-                    <th>Stock</th>
-                    <th>Code-barres</th>
-                    <th>DLC</th>
-                    <th>Promo</th>
-                    <th>🌙 Nuit</th>
-                    <th>État</th>
+                    <th class="ech-th-sort" onclick="window._catSortBy('name')" data-col="name">Nom<span class="ech-sort-arrow">↕️</span></th>
+                    <th class="ech-th-sort" onclick="window._catSortBy('categorie')" data-col="categorie">Catégorie<span class="ech-sort-arrow">↕️</span></th>
+                    <th class="ech-th-sort" onclick="window._catSortBy('prix')" data-col="prix">Prix<span class="ech-sort-arrow">↕️</span></th>
+                    <th class="ech-th-sort ech-sort-active" onclick="window._catSortBy('stock')" data-col="stock">Stock<span class="ech-sort-arrow">▲</span></th>
+                    <th class="ech-th-sort" onclick="window._catSortBy('barcode')" data-col="barcode">Code-barres<span class="ech-sort-arrow">↕️</span></th>
+                    <th class="ech-th-sort" onclick="window._catSortBy('dlc')" data-col="dlc">DLC<span class="ech-sort-arrow">↕️</span></th>
+                    <th class="ech-th-sort" onclick="window._catSortBy('promo')" data-col="promo">Promo<span class="ech-sort-arrow">↕️</span></th>
+                    <th class="ech-th-sort" onclick="window._catSortBy('nuit')" data-col="nuit">🌙 Nuit<span class="ech-sort-arrow">↕️</span></th>
+                    <th class="ech-th-sort" onclick="window._catSortBy('etat')" data-col="etat">État<span class="ech-sort-arrow">↕️</span></th>
                     <th>Actions</th>
                 </tr>
             </thead>
@@ -1888,6 +1901,209 @@ function catInlineFetchBarcode() { showScanToast('ℹ️ Recherche code-barres n
 
 // ===== renderCatalogueTab (36904-37180) =====
 
+/* ===== Produits & Catalogue — tri interactif du tableau (classement automatique) ===== */
+let _catSortState = {col:'stock', dir:'asc'};
+function _catEffectivePrice(p) {
+    const isKg = p.unitType === 'kg';
+    const basePrice = isKg ? p.pricePerKg : p.price;
+    const disc = p.promo || 0;
+    try { return window._promoPrice(basePrice, disc, p.costPrice); } catch(e) { return basePrice || 0; }
+}
+function _catDlcDaysOf(p) {
+    if (!p.expiryDate) return Infinity;
+    const today = new Date(); today.setHours(0,0,0,0);
+    const dd = new Date(p.expiryDate); dd.setHours(0,0,0,0);
+    if (isNaN(dd.getTime())) return Infinity;
+    return Math.ceil((dd-today)/86400000);
+}
+function _catSortValueOf(p, col) {
+    switch (col) {
+        case 'name': return (p.name||'').toLowerCase();
+        case 'categorie': return (p.category||'').toLowerCase();
+        case 'prix': return _catEffectivePrice(p);
+        case 'stock': return parseFloat(p.stock)||0;
+        case 'barcode': return (p.barcode||'').toLowerCase();
+        case 'dlc': return _catDlcDaysOf(p);
+        case 'promo': return p.promo||0;
+        case 'nuit': return p.nightTariff ? 1 : 0;
+        case 'etat': return p.active!==false ? 1 : 0;
+        default: return 0;
+    }
+}
+function _catApplySort(list) {
+    const col = _catSortState.col, dir = _catSortState.dir;
+    const mult = dir === 'asc' ? 1 : -1;
+    return list.slice().sort((a,b) => {
+        const av = _catSortValueOf(a,col), bv = _catSortValueOf(b,col);
+        if (av<bv) return -1*mult;
+        if (av>bv) return 1*mult;
+        return 0;
+    });
+}
+window._catSortBy = function(col) {
+    if (_catSortState.col === col) { _catSortState.dir = _catSortState.dir==='asc'?'desc':'asc'; }
+    else { _catSortState.col = col; _catSortState.dir = 'asc'; }
+    renderCatalogueTab();
+};
+function _catUpdateSortHeaders() {
+    document.querySelectorAll('#cat-table .ech-th-sort').forEach(th => {
+        const col = th.getAttribute('data-col');
+        const arrow = th.querySelector('.ech-sort-arrow');
+        if (col === _catSortState.col) {
+            th.classList.add('ech-sort-active');
+            if (arrow) arrow.textContent = _catSortState.dir==='asc' ? '▲' : '▼';
+        } else {
+            th.classList.remove('ech-sort-active');
+            if (arrow) arrow.textContent = '↕️';
+        }
+    });
+}
+
+/* ===== Produits & Catalogue — KPI (stat tiles, réutilise _devisStatCard) ===== */
+function _catRenderStats(filtered) {
+    const host = document.getElementById('cat-stats-row');
+    if (!host) return;
+    const total = filtered.length;
+    let inStock=0, lowStock=0, outStock=0, masked=0, totalValue=0;
+    filtered.forEach(p => {
+        totalValue += _catEffectivePrice(p) * (parseFloat(p.stock)||0);
+        if (p.active===false) { masked++; return; }
+        const isKg = p.unitType==='kg';
+        if (p.stock<=0) outStock++;
+        else if (p.stock<=(isKg?0.5:5)) lowStock++;
+        else inStock++;
+    });
+    host.innerHTML = [
+        _devisStatCard('📦', total, 'Articles affichés', '#2c6fad'),
+        _devisStatCard('💰', totalValue.toFixed(2)+' €', 'Valeur du stock', '#8e44ad'),
+        _devisStatCard('✅', inStock, 'En stock', '#27ae60'),
+        _devisStatCard('⚠️', lowStock, 'Stock bas', '#e67e22'),
+        _devisStatCard('❌', outStock, 'Épuisés', '#e74c3c'),
+        _devisStatCard('👁️', masked, 'Masqués', '#c49a00'),
+    ].join('');
+}
+
+/* ===== Produits & Catalogue — valeur du stock par catégorie (barres + cumul, axe unique 0-100%) ===== */
+function _catValueByCategory(filtered) {
+    const map = {};
+    filtered.forEach(p => {
+        const cat = p.category || 'Sans catégorie';
+        const val = _catEffectivePrice(p) * (parseFloat(p.stock)||0);
+        map[cat] = (map[cat]||0) + val;
+    });
+    let entries = Object.keys(map).map(k => ({label:k, value:map[k]})).filter(e => e.value>0);
+    entries.sort((a,b) => b.value-a.value);
+    const maxSlots = 6;
+    if (entries.length > maxSlots+1) {
+        const head = entries.slice(0, maxSlots);
+        const tailSum = entries.slice(maxSlots).reduce((s,e)=>s+e.value,0);
+        entries = head.concat([{label:'Autres', value:tailSum}]);
+    }
+    const total = entries.reduce((s,e)=>s+e.value,0) || 1;
+    let cum = 0;
+    entries.forEach(e => { e.pct = e.value/total*100; cum += e.pct; e.cumPct = cum; });
+    return entries;
+}
+function _catRenderValueChart(entries) {
+    const host = document.getElementById('cat-value-chart');
+    if (!host) return;
+    if (!entries.length) { host.innerHTML = '<div style="padding:28px 0;text-align:center;color:var(--text-muted,#95a5a6);font-size:0.8rem;">Aucune donnée pour ce filtre</div>'; return; }
+    const W=600, H=210, padL=34, padR=16, padT=16, padB=34;
+    const plotW=W-padL-padR, plotH=H-padT-padB;
+    const n = entries.length;
+    const bw = Math.min(46, plotW/n*0.6);
+    const xAt = i => padL + (plotW*(i+0.5)/n);
+    const yAt = pct => padT + plotH - (plotH*Math.min(pct,100)/100);
+
+    const gridLines = [0,25,50,75,100].map(f => {
+        const y = yAt(f);
+        return '<line x1="'+padL+'" y1="'+y+'" x2="'+(W-padR)+'" y2="'+y+'" stroke="var(--border-color,#e0e0e0)" stroke-width="1"/>'
+             + '<text x="'+(padL-6)+'" y="'+(y+3)+'" text-anchor="end" font-size="9" fill="var(--text-muted,#95a5a6)">'+f+'%</text>';
+    }).join('');
+    const bars = entries.map((e,i) => {
+        const x = xAt(i)-bw/2, y = yAt(e.pct), h = (padT+plotH)-y;
+        return '<rect x="'+x+'" y="'+y+'" width="'+bw+'" height="'+h+'" rx="4" fill="#2c6fad"/>';
+    }).join('');
+    const xLabels = entries.map((e,i) => {
+        const lbl = e.label.length>10 ? e.label.slice(0,9)+'…' : e.label;
+        return '<text x="'+xAt(i)+'" y="'+(H-10)+'" text-anchor="middle" font-size="9" fill="var(--text-muted,#95a5a6)">'+_esc(lbl)+'</text>';
+    }).join('');
+    const linePts = entries.map((e,i) => xAt(i)+','+yAt(e.cumPct)).join(' ');
+    const lastI = n-1;
+    const lastPct = entries[lastI].cumPct;
+
+    host.innerHTML =
+        '<svg viewBox="0 0 '+W+' '+H+'" style="width:100%;height:auto;display:block;overflow:visible;" id="cat-value-svg">'
+        + gridLines + bars + xLabels
+        + '<polyline points="'+linePts+'" fill="none" stroke="#e38737" stroke-width="2" stroke-dasharray="5,4" stroke-linejoin="round" stroke-linecap="round"/>'
+        + entries.map((e,i) => '<circle cx="'+xAt(i)+'" cy="'+yAt(e.cumPct)+'" r="4" fill="#e38737" stroke="var(--bg-card,#fff)" stroke-width="2"/>').join('')
+        + '<text x="'+(xAt(lastI)+6)+'" y="'+(yAt(lastPct)-6)+'" font-size="10" font-weight="700" fill="var(--text-main,#2c3e50)">'+Math.round(lastPct)+'%</text>'
+        + '<line id="cat-value-crosshair" x1="0" y1="'+padT+'" x2="0" y2="'+(padT+plotH)+'" stroke="var(--text-muted,#95a5a6)" stroke-width="1" opacity="0"/>'
+        + '<rect id="cat-value-hitrect" x="'+padL+'" y="'+padT+'" width="'+plotW+'" height="'+plotH+'" fill="transparent"/>'
+        + '</svg>'
+        + '<div class="ech-tooltip" id="cat-value-tooltip"></div>'
+        + '<div class="ech-legend">'
+        +   '<span class="ech-legend-item"><span class="ech-legend-swatch" style="background:#2c6fad;"></span>Part de la valeur du stock</span>'
+        +   '<span class="ech-legend-item"><span class="ech-legend-line dashed" style="border-color:#e38737;"></span>Cumul</span>'
+        + '</div>';
+
+    const svgEl = document.getElementById('cat-value-svg');
+    const hit = document.getElementById('cat-value-hitrect');
+    const crosshair = document.getElementById('cat-value-crosshair');
+    const tooltip = document.getElementById('cat-value-tooltip');
+    if (hit && svgEl && tooltip && crosshair) {
+        const showAt = (clientX) => {
+            const rect = svgEl.getBoundingClientRect();
+            const scaleX = W/rect.width;
+            const localX = (clientX-rect.left)*scaleX;
+            let idx=0, best=Infinity;
+            entries.forEach((e,i)=>{ const dx=Math.abs(xAt(i)-localX); if(dx<best){best=dx;idx=i;} });
+            const bx = xAt(idx);
+            crosshair.setAttribute('x1', bx); crosshair.setAttribute('x2', bx); crosshair.setAttribute('opacity','1');
+            const e = entries[idx];
+            tooltip.innerHTML = '<strong>'+_esc(e.label)+'</strong><br>'
+                + '<span style="color:#7fb2e0;">●</span> Part : <strong>'+e.pct.toFixed(1)+'%</strong><br>'
+                + '<span style="color:#f0b876;">●</span> Cumul : <strong>'+e.cumPct.toFixed(1)+'%</strong>';
+            const px = (bx/W)*rect.width;
+            tooltip.style.left = Math.min(Math.max(px-40,0), Math.max(rect.width-140,0)) + 'px';
+            tooltip.style.top = '4px';
+            tooltip.classList.add('show');
+        };
+        hit.addEventListener('pointermove', e => showAt(e.clientX));
+        hit.addEventListener('pointerleave', () => { crosshair.setAttribute('opacity','0'); tooltip.classList.remove('show'); });
+    }
+}
+
+/* ===== Produits & Catalogue — état du stock (barre empilée horizontale) ===== */
+function _catRenderStatusChart(filtered) {
+    const host = document.getElementById('cat-status-chart');
+    if (!host) return;
+    const b = {ok:0, low:0, out:0, masked:0};
+    filtered.forEach(p => {
+        if (p.active===false) { b.masked++; return; }
+        const isKg = p.unitType==='kg';
+        if (p.stock<=0) b.out++;
+        else if (p.stock<=(isKg?0.5:5)) b.low++;
+        else b.ok++;
+    });
+    const total = filtered.length || 1;
+    const segs = [
+        {label:'En stock', color:'#27ae60', icon:'✅', count:b.ok},
+        {label:'Stock bas', color:'#e67e22', icon:'⚠️', count:b.low},
+        {label:'Épuisé', color:'#e74c3c', icon:'❌', count:b.out},
+        {label:'Masqué', color:'#c49a00', icon:'👁️', count:b.masked},
+    ];
+    const track = segs.filter(s=>s.count>0).map(s => {
+        const pct = (s.count/total*100);
+        return '<div class="ech-status-bar-seg" style="width:'+pct+'%;background:'+s.color+';" title="'+s.label+' : '+s.count+' ('+pct.toFixed(0)+'%)"></div>';
+    }).join('');
+    const legend = segs.map(s => {
+        const pct = (s.count/total*100).toFixed(0);
+        return '<span class="ech-legend-item"><span class="ech-legend-swatch" style="background:'+s.color+';"></span>'+s.icon+' '+s.label+' : <strong style="color:var(--text-main,#2c3e50);">'+s.count+'</strong> ('+pct+'%)</span>';
+    }).join('');
+    host.innerHTML = '<div class="ech-status-bar-track">'+track+'</div><div class="ech-legend" style="margin-top:10px;">'+legend+'</div>';
+}
+
 function renderCatalogueTab() {
     const search = (document.getElementById('cat-search')?.value || '').toLowerCase();
     const catFilter = document.getElementById('cat-filter-cat')?.value || '';
@@ -1936,29 +2152,19 @@ function renderCatalogueTab() {
         return matchSearch && matchCat && matchUnit && matchStock;
     });
 
-    // Stats
-    const total = products.length;
-    const inStock = products.filter(p => p.stock > 0).length;
-    const outStock = products.filter(p => p.stock <= 0).length;
-    const lowStock = products.filter(p => {
-        const isKg = p.unitType === 'kg';
-        return p.stock > 0 && p.stock <= (isKg ? 0.5 : 5);
-    }).length;
-    const statsRow = document.getElementById('cat-stats-row');
-    if (statsRow) {
-        statsRow.innerHTML = `
-            <div class="cat-stat" style="border-left-color:#3498db;"><h4>${total}</h4><p>📦 Total articles</p></div>
-            <div class="cat-stat" style="border-left-color:#2ecc71;"><h4>${inStock}</h4><p>✅ En stock</p></div>
-            <div class="cat-stat" style="border-left-color:#f39c12;"><h4>${lowStock}</h4><p>⚠️ Stock bas</p></div>
-            <div class="cat-stat" style="border-left-color:#e74c3c;"><h4>${outStock}</h4><p>❌ Épuisés</p></div>
-        `;
-    }
+    // Tri interactif (classement automatique — défaut : stock croissant, articles les plus urgents en premier)
+    const sortedFiltered = _catApplySort(filtered);
+
+    // Stats + graphiques (réagissent aux mêmes filtres que le tableau)
+    _catRenderStats(sortedFiltered);
+    _catRenderValueChart(_catValueByCategory(sortedFiltered));
+    _catRenderStatusChart(sortedFiltered);
 
     const tbody = document.getElementById('cat-tbody');
     const emptyEl = document.getElementById('cat-empty');
     if (!tbody) return;
 
-    if (filtered.length === 0) {
+    if (sortedFiltered.length === 0) {
         tbody.innerHTML = '';
         if (emptyEl) emptyEl.style.display = 'block';
         return;
@@ -1974,7 +2180,7 @@ function renderCatalogueTab() {
         const tableWrap = tbody.closest('.retours-table-wrap');
         if (tableWrap) tableWrap.parentNode.insertBefore(catCountEl, tableWrap);
     }
-    catCountEl.innerHTML = `📦 <strong>${filtered.length}</strong> article(s) affiché(s) <span style="opacity:0.6;">/ ${products.length} total</span>`;
+    catCountEl.innerHTML = `📦 <strong>${sortedFiltered.length}</strong> article(s) affiché(s) <span style="opacity:0.6;">/ ${products.length} total</span>`;
 
     // Détection des codes-barres dupliqués (sur TOUS les produits, pas seulement filtrés)
     const barcodeCount = {};
@@ -2011,7 +2217,7 @@ function renderCatalogueTab() {
         dupBanner.style.display = 'none';
     }
 
-    tbody.innerHTML = filtered.map((p, _catIdx) => {
+    tbody.innerHTML = sortedFiltered.map((p, _catIdx) => {
         const isKg = p.unitType === 'kg';
         const basePrice = isKg ? p.pricePerKg : p.price;
         const disc = p.promo || 0;
@@ -2163,6 +2369,7 @@ function renderCatalogueTab() {
             </td>
         </tr>`;
     }).join('');
+    _catUpdateSortHeaders();
 }
 
 // ===== catToggleInlineEdit (37181-37189) =====
