@@ -1460,7 +1460,7 @@
             </div>
             <div id="bilan-detail-cost-note" style="display:none;font-size:0.7rem;color:var(--text-muted,#888);margin-top:6px;">† Prix d'achat non renseigné pour cet article — marge estimée = chiffre d'affaires.</div>
             <div id="bilan-detail-direct-wrap" style="display:none;margin-top:18px;">
-                <div style="font-weight:800;font-size:0.88rem;margin-bottom:8px;">🧾 Règlements de factures sans ticket</div>
+                <div style="font-weight:800;font-size:0.88rem;margin-bottom:8px;">🧾 Règlements de factures</div>
                 <div id="bilan-detail-direct-list" style="display:flex;flex-direction:column;gap:6px;"></div>
             </div>
         </div>
@@ -8720,20 +8720,43 @@ window._devisGeneratePDF = function(id) {
 // ═══════════════════════════════════════════════════════════════════════
 // ===== BILAN — récapitulatif mensuel =====================================
 // ═══════════════════════════════════════════════════════════════════════
-// Sources : covo_sales_history (tickets de caisse, y compris les lignes de
-// règlement de facture ajoutées à un ticket existant — déjà incluses
-// automatiquement) + covo_devis[].paiements avec ticketId===null (règlements
-// de factures "sans ticket", inclus explicitement à la demande de l'utilisateur).
+// Sources : covo_sales_history (tickets de caisse) + covo_devis[].paiements
+// (TOUS les règlements de facture, qu'ils soient rattachés à un ticket existant
+// ou "sans ticket" — traités de façon UNIFIÉE, voir correctif ci-dessous).
 // Résultat financier = marge (chiffre d'affaires - prix d'achat courant des
 // articles, approximation : le prix d'achat au moment de la vente n'est pas
 // historisé, on utilise le prix d'achat ACTUEL du produit). Montant encaissé =
 // uniquement les composantes de paiement identifiables (espèces/CB/titre-repas
-// pour les tickets, espèces/CB pour les règlements directs) — un règlement en
+// pour les tickets, espèces/CB pour les règlements de facture) — un règlement en
 // mode Crédit/À compte est compté dans le résultat financier (revenu reconnu)
 // mais jamais dans l'encaissé (aucun mouvement de fonds réel), cohérent avec
 // covo_real_balance. Les retours article (type:'retour_article', total négatif)
 // réduisent le résultat financier et les quantités produits, mais n'affectent
 // pas l'encaissé faute de données de remboursement en espèces/CB dans le modèle.
+//
+// CORRECTIF (montants non conformes signalés par l'utilisateur) — deux bugs
+// trouvés et corrigés ici :
+// (1) DATE ERRONÉE pour un règlement de facture rattaché à un ticket EXISTANT :
+//     _devisSettlePayment() ajoute le montant réglé DANS le ticket choisi
+//     (ticket.total/.received/.receivedCash/.receivedCB augmentés) mais NE
+//     CHANGE JAMAIS ticket.date, qui reste la date de la vente D'ORIGINE. Le
+//     Bilan lisait sale.date pour classer tout le ticket dans un mois — un
+//     règlement effectué des mois plus tard sur un vieux ticket se retrouvait
+//     donc compté dans le mois de la vente d'origine au lieu du mois où
+//     l'argent a réellement été encaissé (le mois en cours affichait alors un
+//     montant trop bas, et un vieux mois « remontait » avec de l'argent qui
+//     n'en faisait pas partie). Corrigé : on soustrait du ticket la part
+//     cumulée de tous ses règlements de facture (connue précisément via
+//     covo_devis[].paiements, indexée par ticketId) pour ne garder que la
+//     vente d'origine dans son mois, puis CHAQUE règlement (rattaché à un
+//     ticket ou non) est compté séparément dans le mois de SA PROPRE DATE
+//     (paiement.date) — traitement désormais unifié, sans distinction ticket/
+//     sans-ticket dans le calcul.
+// (2) FAUX "PRODUIT" DANS LE DÉTAIL : la ligne "Règlement facture DEV-... "
+//     ajoutée au ticket (item.paid===true) était comptée dans le détail par
+//     produit comme s'il s'agissait d'un article vendu. Corrigé : ces lignes
+//     sont maintenant exclues du regroupement par produit (elles apparaissent
+//     uniquement dans la section dédiée "🧾 Règlements de factures").
 let _bilanSortState = {col:'mois', dir:'desc'};
 const _BILAN_MOIS_FR = ['Janvier','Février','Mars','Avril','Mai','Juin','Juillet','Août','Septembre','Octobre','Novembre','Décembre'];
 function _bilanKeyOf(dateStr) {
@@ -8753,8 +8776,28 @@ function _bilanNewEntry(key) {
 function _bilanCompute() {
     const map = {};
     const getEntry = key => { if (!map[key]) map[key] = _bilanNewEntry(key); return map[key]; };
+    const r2 = n => Math.round((n||0)*100)/100;
 
-    // Tickets de caisse (ventes + retours + règlements de facture déjà rattachés à un ticket)
+    const devisAll = (typeof _devisGetAll === 'function') ? _devisGetAll() : [];
+
+    // 1) Cumul, par ticketId, de TOUS les règlements de facture jamais appliqués
+    //    à ce ticket (peu importe leur date) — sert à isoler la part "vente
+    //    d'origine" du ticket de la part "règlement(s) ajouté(s) après coup".
+    const settledByTicket = {};
+    devisAll.forEach(d => {
+        (d.paiements||[]).forEach(p => {
+            if (p.ticketId === null || p.ticketId === undefined) return;
+            const tk = String(p.ticketId);
+            if (!settledByTicket[tk]) settledByTicket[tk] = { montant:0, montantEspeces:0, montantCB:0 };
+            settledByTicket[tk].montant += (parseFloat(p.montant)||0);
+            settledByTicket[tk].montantEspeces += (parseFloat(p.montantEspeces)||0);
+            settledByTicket[tk].montantCB += (parseFloat(p.montantCB)||0);
+        });
+    });
+
+    // 2) Tickets de caisse (ventes + retours), en ne gardant QUE la part
+    //    "vente d'origine" — la part réglée après coup via _devisSettlePayment
+    //    est retirée ici et recomptée à l'étape 3 dans le mois de sa propre date.
     let sales = [];
     try { sales = JSON.parse(localStorage.getItem('covo_sales_history') || '[]'); } catch(e) { sales = []; }
     sales.forEach(sale => {
@@ -8762,12 +8805,17 @@ function _bilanCompute() {
         if (!key) return;
         const entry = getEntry(key);
         const sign = sale.type === 'retour_article' ? -1 : 1;
-        entry.revenue += (parseFloat(sale.total)||0);
+        const settled = settledByTicket[String(sale.id)];
+        const baseTotal = r2((parseFloat(sale.total)||0) - (settled ? settled.montant : 0));
+        const baseCash = r2((parseFloat(sale.receivedCash)||0) - (settled ? settled.montantEspeces : 0));
+        const baseCB = r2((parseFloat(sale.receivedCB)||0) - (settled ? settled.montantCB : 0));
+        entry.revenue += baseTotal;
         if (sign > 0) entry.ticketCount++;
-        entry.cash += (parseFloat(sale.receivedCash)||0);
-        entry.cb += (parseFloat(sale.receivedCB)||0);
+        entry.cash += baseCash;
+        entry.cb += baseCB;
         entry.autres += (parseFloat(sale.receivedTicket)||0);
         (sale.items||[]).forEach(item => {
+            if (item.paid === true) return; // ligne de règlement de facture ajoutée au ticket — pas un produit
             const qty = (parseFloat(item.quantity)||0) * sign;
             const lineRevenue = (parseFloat(item.price)||0) * (parseFloat(item.quantity)||0) * sign;
             const prod = (typeof products !== 'undefined' ? products : []).find(p => p.id === item.id);
@@ -8785,11 +8833,10 @@ function _bilanCompute() {
         });
     });
 
-    // Règlements de factures "sans ticket" (covo_devis[].paiements, ticketId === null)
-    const devisAll = (typeof _devisGetAll === 'function') ? _devisGetAll() : [];
+    // 3) TOUS les règlements de facture (rattachés à un ticket ou non), chacun
+    //    compté dans le mois de SA PROPRE DATE — traitement unifié.
     devisAll.forEach(d => {
         (d.paiements||[]).forEach(p => {
-            if (p.ticketId !== null && p.ticketId !== undefined) return; // déjà compté via le ticket
             const key = _bilanKeyOf(p.date);
             if (!key) return;
             const entry = getEntry(key);
@@ -8801,7 +8848,9 @@ function _bilanCompute() {
                 client: (d.client && d.client.nom) || '—',
                 montant: parseFloat(p.montant)||0,
                 mode: p.mode,
-                date: p.date
+                date: p.date,
+                viaTicket: (p.ticketId !== null && p.ticketId !== undefined),
+                ticketNumero: p.ticketNumero || null
             });
         });
     });
@@ -9010,6 +9059,7 @@ window._bilanOpenDetail = function(key) {
             _devisStatCard('💼', _devisFmtEUR(entry.revenue), 'Chiffre d\'affaires', '#2c6fad'),
             _devisStatCard('📊', _devisFmtEUR(entry.margin), 'Résultat financier', entry.margin>=0?'#27ae60':'#e74c3c'),
             _devisStatCard('💰', _devisFmtEUR(entry.encaisse), 'Total encaissé', '#8e44ad'),
+            _devisStatCard('🧾', entry.ticketCount, 'Ventes', '#e67e22'),
             _devisStatCard('📦', Object.keys(entry.productMap).length, 'Produits distincts', '#5d7a8c'),
         ].join('');
     }
@@ -9046,8 +9096,9 @@ window._bilanOpenDetail = function(key) {
             directList.innerHTML = entry.directSettlements.map(s => {
                 const modeTxt = (typeof _devisPaymentModeLabel === 'function') ? _devisPaymentModeLabel(s.mode, true) : s.mode;
                 const dateTxt = s.date ? new Date(s.date).toLocaleDateString('fr-FR') : '—';
+                const viaTxt = s.viaTicket ? ('🎫 Ticket #'+_esc(s.ticketNumero||'?')) : '⚡ Sans ticket';
                 return '<div style="display:flex;align-items:center;justify-content:space-between;gap:10px;padding:8px 12px;background:var(--bg-card-2,#f4f6f9);border-radius:8px;font-size:0.82rem;">'
-                    + '<span>🧾 <strong>'+_esc(s.numero)+'</strong> — '+_esc(s.client)+' <span style="color:var(--text-muted,#888);">('+dateTxt+')</span></span>'
+                    + '<span>🧾 <strong>'+_esc(s.numero)+'</strong> — '+_esc(s.client)+' <span style="color:var(--text-muted,#888);">('+dateTxt+' · '+viaTxt+')</span></span>'
                     + '<span><strong>'+_devisFmtEUR(s.montant)+'</strong> <span style="color:var(--text-muted,#888);">'+_esc(modeTxt)+'</span></span>'
                     + '</div>';
             }).join('');
