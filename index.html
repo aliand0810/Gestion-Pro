@@ -1442,17 +1442,14 @@
     <div id="bilan-empty" style="display:none;text-align:center;padding:40px;color:var(--text-muted,#7f8c8d);font-size:0.9rem;">
         📊 Aucune vente enregistrée pour le moment.
     </div>
-</div>
-</div>
 
-<!-- ===== Modale détail mensuel (bilan-detail-modal) ===== -->
-<div class="rm-overlay" id="bilan-detail-modal">
-    <div class="rm-modal" style="width:980px;">
-        <div class="rm-header">
-            <h3 id="bilan-detail-title">📊 Détail du mois</h3>
-            <button class="rm-close" onclick="closeRetourModal('bilan-detail-modal')">✕</button>
+    <!-- ===== Détail mensuel — panneau EN LIGNE (plus une fenêtre popup) : s'ouvre directement dans la page, sous le tableau ===== -->
+    <div id="bilan-detail-inline" style="display:none;margin-top:18px;background:var(--bg-card,#fff);border:1.5px solid var(--border-color,#e6e0d6);border-radius:14px;box-shadow:0 6px 22px rgba(0,0,0,0.08);overflow:hidden;">
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;padding:14px 18px;background:linear-gradient(135deg,rgba(142,68,173,0.10),rgba(91,44,111,0.05));border-bottom:1.5px solid var(--border-color,#eee);position:sticky;top:0;z-index:5;">
+            <h3 id="bilan-detail-title" style="margin:0;font-size:1rem;">📊 Détail du mois</h3>
+            <button type="button" onclick="window._bilanCloseDetail()" style="border:none;background:rgba(0,0,0,0.06);color:var(--text-main,#333);width:30px;height:30px;border-radius:8px;font-size:0.95rem;cursor:pointer;">✕</button>
         </div>
-        <div class="rm-body">
+        <div style="padding:16px 18px;">
             <div id="bilan-detail-stats" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;margin-bottom:16px;"></div>
 
             <!-- Navigation rapide : sauter directement à une section sans avoir à parcourir tout le détail -->
@@ -1515,10 +1512,11 @@
                 <div id="bilan-detail-direct-list" style="display:flex;flex-direction:column;gap:6px;"></div>
             </div>
         </div>
-        <div class="rm-footer">
-            <button class="retours-btn retours-btn-outline" onclick="closeRetourModal('bilan-detail-modal')">Fermer</button>
+        <div style="display:flex;justify-content:flex-end;padding:12px 18px;border-top:1.5px solid var(--border-color,#eee);">
+            <button class="retours-btn retours-btn-outline" onclick="window._bilanCloseDetail()">Fermer</button>
         </div>
     </div>
+</div>
 </div>
 
 <div role="dialog" aria-modal="true" id="devis-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.7);backdrop-filter:blur(8px);z-index:99800;justify-content:center;align-items:flex-start;overflow-y:auto;padding:20px 8px;">
@@ -8829,11 +8827,15 @@ window._devisGeneratePDF = function(id) {
 //     tout le bilan ni casser l'échelle des courbes.
 const BILAN_SANE_CAP = 100000; // € — au-delà, un montant individuel est considéré comme une valeur aberrante (bug de saisie/données corrompues), pas une vraie transaction
 let _bilanLastAnomalies = [];
-function _bilanSafeNum(raw, label, key) {
+// `ref` (optionnel) identifie PRÉCISÉMENT l'enregistrement/champ source (localStorage key,
+// id unique, nom du champ) — permet à window._bilanFixAnomaly() de corriger la valeur en
+// place, sans dépendre du numéro de ticket affiché (qui peut être partagé par plusieurs
+// tickets après une réinitialisation du compteur, voir historique_pro.html).
+function _bilanSafeNum(raw, label, key, ref) {
     const n = parseFloat(raw);
     if (!isFinite(n) || isNaN(n)) return 0;
     if (Math.abs(n) > BILAN_SANE_CAP) {
-        _bilanLastAnomalies.push({ key: key || null, label: label || 'valeur', value: n });
+        _bilanLastAnomalies.push({ key: key || null, label: label || 'valeur', value: n, ref: ref || null });
         return 0;
     }
     return n;
@@ -8873,9 +8875,10 @@ function _bilanCompute() {
             if (!settledByTicket[tk]) settledByTicket[tk] = { montant:0, montantEspeces:0, montantCB:0 };
             const pKey = _bilanKeyOf(p.date);
             const pLabel = 'règlement facture ' + (d.numero || '?');
-            settledByTicket[tk].montant += _bilanSafeNum(p.montant, pLabel+' (montant)', pKey);
-            settledByTicket[tk].montantEspeces += _bilanSafeNum(p.montantEspeces, pLabel+' (espèces)', pKey);
-            settledByTicket[tk].montantCB += _bilanSafeNum(p.montantCB, pLabel+' (CB)', pKey);
+            const pRef = f => ({ store:'covo_devis', devisId:d.id, paymentId:p.id, field:f });
+            settledByTicket[tk].montant += _bilanSafeNum(p.montant, pLabel+' (montant)', pKey, pRef('montant'));
+            settledByTicket[tk].montantEspeces += _bilanSafeNum(p.montantEspeces, pLabel+' (espèces)', pKey, pRef('montantEspeces'));
+            settledByTicket[tk].montantCB += _bilanSafeNum(p.montantCB, pLabel+' (CB)', pKey, pRef('montantCB'));
         });
     });
 
@@ -8890,11 +8893,17 @@ function _bilanCompute() {
         const entry = getEntry(key);
         const sign = sale.type === 'retour_article' ? -1 : 1;
         const settled = settledByTicket[String(sale.id)];
-        const tLabel = 'ticket #' + (sale.ticketNum || sale.id);
-        const rawTotal = _bilanSafeNum(sale.total, tLabel+' (total)', key);
-        const rawCash = _bilanSafeNum(sale.receivedCash, tLabel+' (espèces)', key);
-        const rawCB = _bilanSafeNum(sale.receivedCB, tLabel+' (CB)', key);
-        const rawTicket = _bilanSafeNum(sale.receivedTicket, tLabel+' (titre-repas)', key);
+        // Date incluse dans le libellé : le n° de ticket seul peut être partagé par plusieurs
+        // ventes après une réinitialisation du compteur (voir historique_pro.html) — la date
+        // permet de reconnaître le BON ticket à l'œil ; la correction elle-même (voir sRef,
+        // window._bilanFixAnomaly) s'appuie sur sale.id, jamais ambigu.
+        const tDateTxt = sale.date ? new Date(sale.date).toLocaleDateString('fr-FR') : '?';
+        const tLabel = 'ticket #' + (sale.ticketNum != null ? sale.ticketNum : sale.id) + ' du ' + tDateTxt;
+        const sRef = f => ({ store:'covo_sales_history', id:sale.id, field:f });
+        const rawTotal = _bilanSafeNum(sale.total, tLabel+' (total)', key, sRef('total'));
+        const rawCash = _bilanSafeNum(sale.receivedCash, tLabel+' (espèces)', key, sRef('receivedCash'));
+        const rawCB = _bilanSafeNum(sale.receivedCB, tLabel+' (CB)', key, sRef('receivedCB'));
+        const rawTicket = _bilanSafeNum(sale.receivedTicket, tLabel+' (titre-repas)', key, sRef('receivedTicket'));
         const baseTotal = r2(rawTotal - (settled ? settled.montant : 0));
         const baseCash = r2(rawCash - (settled ? settled.montantEspeces : 0));
         const baseCB = r2(rawCB - (settled ? settled.montantCB : 0));
@@ -8953,13 +8962,15 @@ function _bilanCompute() {
             if (!key) return;
             const entry = getEntry(key);
             const pLabel = 'règlement facture ' + (d.numero || '?');
-            entry.revenue += _bilanSafeNum(p.montant, pLabel+' (montant)', key);
-            entry.cash += _bilanSafeNum(p.montantEspeces, pLabel+' (espèces)', key);
-            entry.cb += _bilanSafeNum(p.montantCB, pLabel+' (CB)', key);
+            const pRef = f => ({ store:'covo_devis', devisId:d.id, paymentId:p.id, field:f });
+            const pMontant = _bilanSafeNum(p.montant, pLabel+' (montant)', key, pRef('montant'));
+            entry.revenue += pMontant;
+            entry.cash += _bilanSafeNum(p.montantEspeces, pLabel+' (espèces)', key, pRef('montantEspeces'));
+            entry.cb += _bilanSafeNum(p.montantCB, pLabel+' (CB)', key, pRef('montantCB'));
             entry.directSettlements.push({
                 numero: d.numero || '—',
                 client: (d.client && d.client.nom) || '—',
-                montant: _bilanSafeNum(p.montant, pLabel+' (montant)', key),
+                montant: pMontant,
                 mode: p.mode,
                 date: p.date,
                 viaTicket: (p.ticketId !== null && p.ticketId !== undefined),
@@ -8979,7 +8990,7 @@ function _bilanCompute() {
         if (!key) return;
         const entry = getEntry(key);
         const aLabel = 'approvisionnement #' + (a.numero || a.id || '?');
-        const montant = _bilanSafeNum(a.montant, aLabel, key);
+        const montant = _bilanSafeNum(a.montant, aLabel, key, { store:'covo_approvisionnements', id:a.id, field:'montant' });
         entry.appro += montant;
         entry.approList.push({
             numero: a.numero || '—',
@@ -9365,23 +9376,100 @@ window._bilanOpenDetail = function(key) {
         }
     }
 
-    openRetourModal('bilan-detail-modal');
+    const inlineHost = document.getElementById('bilan-detail-inline');
+    if (inlineHost) {
+        inlineHost.style.display = 'block';
+        inlineHost.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
 };
 
+// Panneau détail mensuel : en ligne dans la page (plus une fenêtre popup) — on masque simplement le panneau
+window._bilanCloseDetail = function() {
+    const inlineHost = document.getElementById('bilan-detail-inline');
+    if (inlineHost) inlineHost.style.display = 'none';
+    _bilanDetailEntry = null;
+};
+
+// Deux passes de _bilanCompute() (settledByTicket puis règlements) lisent parfois le MÊME
+// champ source (ex. p.montant d'un règlement) — dédoublonne par référence exacte (store+id+
+// champ) pour ne jamais afficher/compter deux fois la même anomalie.
+function _bilanDedupeAnomalies(list) {
+    const seen = new Set();
+    const out = [];
+    list.forEach(a => {
+        const sig = a.ref ? JSON.stringify(a.ref) : (a.key+'|'+a.label+'|'+a.value);
+        if (seen.has(sig)) return;
+        seen.add(sig);
+        out.push(a);
+    });
+    return out;
+}
+let _bilanAnomalyDeduped = [];
 function _bilanRenderAnomalyBanner() {
     const host = document.getElementById('bilan-anomaly-banner');
     if (!host) return;
-    if (!_bilanLastAnomalies.length) { host.style.display = 'none'; host.innerHTML = ''; return; }
-    const items = _bilanLastAnomalies.slice(0, 6).map(a => {
+    _bilanAnomalyDeduped = _bilanDedupeAnomalies(_bilanLastAnomalies);
+    if (!_bilanAnomalyDeduped.length) { host.style.display = 'none'; host.innerHTML = ''; return; }
+    const rows = _bilanAnomalyDeduped.slice(0, 8).map((a, idx) => {
         const moisTxt = a.key ? _bilanLabelOf(a.key) : '?';
-        return '<li>'+_esc(moisTxt)+' — '+_esc(a.label)+' : <strong>'+_devisFmtEUR(a.value)+'</strong></li>';
+        const fixUI = a.ref
+            ? ('<input type="number" step="0.01" value="0" id="bilan-anomaly-fix-input-'+idx+'" style="width:90px;padding:4px 6px;border-radius:6px;border:1px solid #e0c9a6;font-size:0.76rem;" title="Valeur corrigée à enregistrer (0€ par défaut)">'
+               + '<button type="button" onclick="window._bilanFixAnomaly('+idx+')" style="padding:4px 10px;border-radius:6px;border:none;background:#e38737;color:#fff;font-size:0.72rem;font-weight:700;cursor:pointer;">✅ Corriger</button>')
+            : '<span style="font-size:0.7rem;color:var(--text-muted,#a08050);">non corrigible automatiquement</span>';
+        return '<div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;padding:6px 0;'+(idx>0?'border-top:1px dashed rgba(122,74,18,0.2);':'')+'">'
+            + '<span style="font-size:0.78rem;">'+_esc(moisTxt)+' — '+_esc(a.label)+' : <strong>'+_devisFmtEUR(a.value)+'</strong></span>'
+            + '<span style="display:flex;align-items:center;gap:6px;">'+fixUI+'</span>'
+            + '</div>';
     }).join('');
-    const more = _bilanLastAnomalies.length > 6 ? ('<div style="margin-top:4px;">… et '+(_bilanLastAnomalies.length-6)+' autre(s).</div>') : '';
-    host.innerHTML = '<div style="font-weight:800;margin-bottom:4px;">⚠️ '+_bilanLastAnomalies.length+' valeur(s) aberrante(s) détectée(s) et ignorée(s) dans le calcul</div>'
-        + '<div style="font-size:0.78rem;">Ces montants dépassent '+_devisFmtEUR(BILAN_SANE_CAP)+' pour une seule transaction — probablement une erreur de saisie ou une donnée corrompue. Ils ont été exclus du bilan pour ne pas fausser les totaux. Vérifiez ces enregistrements :</div>'
-        + '<ul style="margin:6px 0 0 18px;padding:0;font-size:0.78rem;">'+items+'</ul>'+more;
+    const more = _bilanAnomalyDeduped.length > 8 ? ('<div style="margin-top:4px;font-size:0.76rem;">… et '+(_bilanAnomalyDeduped.length-8)+' autre(s), toujours exclue(s) du calcul.</div>') : '';
+    host.innerHTML = '<div style="font-weight:800;margin-bottom:4px;">⚠️ '+_bilanAnomalyDeduped.length+' valeur(s) aberrante(s) détectée(s) et ignorée(s) dans le calcul</div>'
+        + '<div style="font-size:0.78rem;margin-bottom:6px;">Ces montants dépassent '+_devisFmtEUR(BILAN_SANE_CAP)+' pour une seule transaction — probablement une erreur de saisie ou une donnée corrompue. Ils sont exclus du bilan (comptés comme 0€) pour ne pas fausser les totaux. Le nom indique le ticket/règlement/achat concerné avec sa date, pour le retrouver sans ambiguïté même si son numéro affiché est partagé par un autre. Saisissez la valeur correcte (0€ par défaut) puis « Corriger » pour la remplacer directement dans vos données :</div>'
+        + rows + more;
     host.style.display = 'block';
 }
+window._bilanFixAnomaly = function(idx) {
+    const a = _bilanAnomalyDeduped[idx];
+    if (!a || !a.ref) { showScanToast('Correction indisponible pour cette valeur', 'info'); return; }
+    const inputEl = document.getElementById('bilan-anomaly-fix-input-'+idx);
+    const newVal = inputEl ? (parseFloat(inputEl.value) || 0) : 0;
+    const moisTxt = a.key ? _bilanLabelOf(a.key) : '?';
+    if (!confirm('Remplacer la valeur aberrante de '+_devisFmtEUR(a.value)+' ('+a.label+', '+moisTxt+') par '+_devisFmtEUR(newVal)+' ?\n\nCette action modifie directement vos données et ne peut pas être annulée automatiquement — vérifiez la valeur avant de confirmer.')) return;
+    try {
+        const ref = a.ref;
+        if (ref.store === 'covo_sales_history') {
+            const list = JSON.parse(localStorage.getItem('covo_sales_history') || '[]');
+            const i = list.findIndex(s => String(s.id) === String(ref.id));
+            if (i === -1) { showScanToast('⚠️ Ticket introuvable (peut-être déjà modifié)', 'info'); return; }
+            list[i][ref.field] = newVal;
+            localStorage.setItem('covo_sales_history', JSON.stringify(list));
+            if (typeof salesHistory !== 'undefined' && Array.isArray(salesHistory)) {
+                const si = salesHistory.findIndex(s => String(s.id) === String(ref.id));
+                if (si !== -1) salesHistory[si][ref.field] = newVal;
+            }
+        } else if (ref.store === 'covo_devis') {
+            const list = JSON.parse(localStorage.getItem('covo_devis') || '[]');
+            const d = list.find(x => String(x.id) === String(ref.devisId));
+            if (!d) { showScanToast('⚠️ Facture introuvable (peut-être déjà modifiée)', 'info'); return; }
+            const p = (d.paiements||[]).find(pp => String(pp.id) === String(ref.paymentId));
+            if (!p) { showScanToast('⚠️ Règlement introuvable (peut-être déjà modifié)', 'info'); return; }
+            p[ref.field] = newVal;
+            localStorage.setItem('covo_devis', JSON.stringify(list));
+        } else if (ref.store === 'covo_approvisionnements') {
+            const list = JSON.parse(localStorage.getItem('covo_approvisionnements') || '[]');
+            const i = list.findIndex(x => String(x.id) === String(ref.id));
+            if (i === -1) { showScanToast('⚠️ Approvisionnement introuvable (peut-être déjà modifié)', 'info'); return; }
+            list[i][ref.field] = newVal;
+            localStorage.setItem('covo_approvisionnements', JSON.stringify(list));
+        } else {
+            showScanToast('Type de donnée non pris en charge pour la correction', 'info'); return;
+        }
+        if (typeof cpDriveMarkDirty === 'function') cpDriveMarkDirty();
+        showScanToast('✅ Valeur corrigée — bilan recalculé', 'success');
+        _bilanInit();
+    } catch (e) {
+        showScanToast('⚠️ Erreur lors de la correction : ' + (e && e.message ? e.message : e), 'info');
+    }
+};
 function _bilanInit() {
     _bilanMonthsCache = _bilanCompute();
     const sorted = _bilanApplySort(_bilanMonthsCache);
