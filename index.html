@@ -1407,7 +1407,10 @@
         </div>
     </div>
 
-    <div id="bilan-stats-row" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-bottom:16px;"></div>
+    <div id="bilan-anomaly-banner" style="display:none;background:#fdf1e8;border:1.5px solid #e38737;color:#7a4a12;border-radius:10px;padding:10px 14px;margin-bottom:14px;"></div>
+
+    <div id="bilan-stats-row" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-bottom:6px;"></div>
+    <div style="font-size:0.72rem;color:var(--text-muted,#888);margin-bottom:16px;">💡 Résultat financier = Chiffre d'affaires du mois − montant réel des approvisionnements (achats/réassorts saisis dans Investissement Pro) du même mois.</div>
 
     <div class="ech-charts-row">
         <div class="ech-chart-card">
@@ -1451,14 +1454,17 @@
         </div>
         <div class="rm-body">
             <div id="bilan-detail-stats" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;margin-bottom:18px;"></div>
-            <div style="font-weight:800;font-size:0.88rem;margin-bottom:8px;">📦 Produits vendus <span style="font-weight:400;font-size:0.72rem;color:var(--text-muted,#888);">(triés du plus vendu au moins vendu)</span></div>
+            <div style="font-weight:800;font-size:0.88rem;margin-bottom:8px;">🏷️ Produits vendus <span style="font-weight:400;font-size:0.72rem;color:var(--text-muted,#888);">(triés du plus vendu au moins vendu)</span></div>
             <div class="retours-table-wrap">
                 <table class="retours-table" id="bilan-detail-table">
-                    <thead><tr><th>Produit</th><th>Quantité</th><th>Chiffre d'affaires</th><th>Marge estimée</th></tr></thead>
+                    <thead><tr><th>Produit</th><th>Quantité</th><th>Chiffre d'affaires</th></tr></thead>
                     <tbody id="bilan-detail-tbody"></tbody>
                 </table>
             </div>
-            <div id="bilan-detail-cost-note" style="display:none;font-size:0.7rem;color:var(--text-muted,#888);margin-top:6px;">† Prix d'achat non renseigné pour cet article — marge estimée = chiffre d'affaires.</div>
+            <div id="bilan-detail-appro-wrap" style="display:none;margin-top:18px;">
+                <div style="font-weight:800;font-size:0.88rem;margin-bottom:8px;">📦 Approvisionnements du mois <span style="font-weight:400;font-size:0.72rem;color:var(--text-muted,#888);">(déduits du chiffre d'affaires pour former le résultat financier)</span></div>
+                <div id="bilan-detail-appro-list" style="display:flex;flex-direction:column;gap:6px;"></div>
+            </div>
             <div id="bilan-detail-direct-wrap" style="display:none;margin-top:18px;">
                 <div style="font-weight:800;font-size:0.88rem;margin-bottom:8px;">🧾 Règlements de factures</div>
                 <div id="bilan-detail-direct-list" style="display:flex;flex-direction:column;gap:6px;"></div>
@@ -8722,19 +8728,26 @@ window._devisGeneratePDF = function(id) {
 // ═══════════════════════════════════════════════════════════════════════
 // Sources : covo_sales_history (tickets de caisse) + covo_devis[].paiements
 // (TOUS les règlements de facture, qu'ils soient rattachés à un ticket existant
-// ou "sans ticket" — traités de façon UNIFIÉE, voir correctif ci-dessous).
-// Résultat financier = marge (chiffre d'affaires - prix d'achat courant des
-// articles, approximation : le prix d'achat au moment de la vente n'est pas
-// historisé, on utilise le prix d'achat ACTUEL du produit). Montant encaissé =
-// uniquement les composantes de paiement identifiables (espèces/CB/titre-repas
-// pour les tickets, espèces/CB pour les règlements de facture) — un règlement en
-// mode Crédit/À compte est compté dans le résultat financier (revenu reconnu)
-// mais jamais dans l'encaissé (aucun mouvement de fonds réel), cohérent avec
+// ou "sans ticket" — traités de façon UNIFIÉE, voir correctif ci-dessous) +
+// covo_approvisionnements (achats/réapprovisionnements réels, saisis dans
+// Investissement Pro).
+// Résultat financier = chiffre d'affaires du mois − montant RÉEL des
+// approvisionnements (achats/réassorts) du même mois, tel qu'enregistré dans
+// Investissement Pro (covo_approvisionnements[].montant, classé par sa date
+// d'achat). Ce n'est plus une marge théorique basée sur le prix d'achat
+// courant du produit (costPrice) : on utilise désormais l'argent RÉELLEMENT
+// dépensé en réapprovisionnement ce mois-là, quel que soit le produit acheté —
+// cohérent avec la demande : "le résultat financier doit afficher le montant
+// d'approvisionnement réel effectué". Montant encaissé = uniquement les
+// composantes de paiement identifiables (espèces/CB/titre-repas pour les
+// tickets, espèces/CB pour les règlements de facture) — un règlement en mode
+// Crédit/À compte est compté dans le résultat financier (revenu reconnu) mais
+// jamais dans l'encaissé (aucun mouvement de fonds réel), cohérent avec
 // covo_real_balance. Les retours article (type:'retour_article', total négatif)
-// réduisent le résultat financier et les quantités produits, mais n'affectent
+// réduisent le chiffre d'affaires et les quantités produits, mais n'affectent
 // pas l'encaissé faute de données de remboursement en espèces/CB dans le modèle.
 //
-// CORRECTIF (montants non conformes signalés par l'utilisateur) — deux bugs
+// CORRECTIF (montants non conformes signalés par l'utilisateur) — bugs
 // trouvés et corrigés ici :
 // (1) DATE ERRONÉE pour un règlement de facture rattaché à un ticket EXISTANT :
 //     _devisSettlePayment() ajoute le montant réglé DANS le ticket choisi
@@ -8757,6 +8770,29 @@ window._devisGeneratePDF = function(id) {
 //     produit comme s'il s'agissait d'un article vendu. Corrigé : ces lignes
 //     sont maintenant exclues du regroupement par produit (elles apparaissent
 //     uniquement dans la section dédiée "🧾 Règlements de factures").
+// (3) MONTANT ABERRANT (ex : avril affichant ~50 000 milliards €) : une seule
+//     valeur corrompue/mal saisie quelque part dans covo_sales_history ou
+//     covo_devis (ex : un receivedCash ou montantEspeces avec un nombre de
+//     chiffres délirant) suffisait à faire exploser tout le mois ainsi que les
+//     tuiles cumulées et l'échelle des graphiques. Corrigé : chaque montant
+//     individuel (total/espèces/CB/titre-repas de ticket, montant/espèces/CB
+//     de règlement, montant d'approvisionnement) passe désormais par
+//     _bilanSafeNum() : au-delà de BILAN_SANE_CAP (100 000 €, largement au-delà
+//     de toute transaction réaliste pour ce commerce), la valeur est ignorée
+//     (comptée comme 0) et journalisée dans _bilanLastAnomalies pour affichage
+//     d'un bandeau d'alerte — une seule ligne corrompue ne peut plus fausser
+//     tout le bilan ni casser l'échelle des courbes.
+const BILAN_SANE_CAP = 100000; // € — au-delà, un montant individuel est considéré comme une valeur aberrante (bug de saisie/données corrompues), pas une vraie transaction
+let _bilanLastAnomalies = [];
+function _bilanSafeNum(raw, label, key) {
+    const n = parseFloat(raw);
+    if (!isFinite(n) || isNaN(n)) return 0;
+    if (Math.abs(n) > BILAN_SANE_CAP) {
+        _bilanLastAnomalies.push({ key: key || null, label: label || 'valeur', value: n });
+        return 0;
+    }
+    return n;
+}
 let _bilanSortState = {col:'mois', dir:'desc'};
 const _BILAN_MOIS_FR = ['Janvier','Février','Mars','Avril','Mai','Juin','Juillet','Août','Septembre','Octobre','Novembre','Décembre'];
 function _bilanKeyOf(dateStr) {
@@ -8771,12 +8807,13 @@ function _bilanLabelOf(key) {
     return (_BILAN_MOIS_FR[m]||'?') + ' ' + y;
 }
 function _bilanNewEntry(key) {
-    return { key, label:_bilanLabelOf(key), revenue:0, cogs:0, cash:0, cb:0, autres:0, ticketCount:0, productMap:{}, directSettlements:[] };
+    return { key, label:_bilanLabelOf(key), revenue:0, appro:0, approList:[], cash:0, cb:0, autres:0, ticketCount:0, productMap:{}, directSettlements:[] };
 }
 function _bilanCompute() {
     const map = {};
     const getEntry = key => { if (!map[key]) map[key] = _bilanNewEntry(key); return map[key]; };
     const r2 = n => Math.round((n||0)*100)/100;
+    _bilanLastAnomalies = []; // réinitialisé à chaque calcul
 
     const devisAll = (typeof _devisGetAll === 'function') ? _devisGetAll() : [];
 
@@ -8789,9 +8826,11 @@ function _bilanCompute() {
             if (p.ticketId === null || p.ticketId === undefined) return;
             const tk = String(p.ticketId);
             if (!settledByTicket[tk]) settledByTicket[tk] = { montant:0, montantEspeces:0, montantCB:0 };
-            settledByTicket[tk].montant += (parseFloat(p.montant)||0);
-            settledByTicket[tk].montantEspeces += (parseFloat(p.montantEspeces)||0);
-            settledByTicket[tk].montantCB += (parseFloat(p.montantCB)||0);
+            const pKey = _bilanKeyOf(p.date);
+            const pLabel = 'règlement facture ' + (d.numero || '?');
+            settledByTicket[tk].montant += _bilanSafeNum(p.montant, pLabel+' (montant)', pKey);
+            settledByTicket[tk].montantEspeces += _bilanSafeNum(p.montantEspeces, pLabel+' (espèces)', pKey);
+            settledByTicket[tk].montantCB += _bilanSafeNum(p.montantCB, pLabel+' (CB)', pKey);
         });
     });
 
@@ -8806,30 +8845,29 @@ function _bilanCompute() {
         const entry = getEntry(key);
         const sign = sale.type === 'retour_article' ? -1 : 1;
         const settled = settledByTicket[String(sale.id)];
-        const baseTotal = r2((parseFloat(sale.total)||0) - (settled ? settled.montant : 0));
-        const baseCash = r2((parseFloat(sale.receivedCash)||0) - (settled ? settled.montantEspeces : 0));
-        const baseCB = r2((parseFloat(sale.receivedCB)||0) - (settled ? settled.montantCB : 0));
+        const tLabel = 'ticket #' + (sale.ticketNum || sale.id);
+        const rawTotal = _bilanSafeNum(sale.total, tLabel+' (total)', key);
+        const rawCash = _bilanSafeNum(sale.receivedCash, tLabel+' (espèces)', key);
+        const rawCB = _bilanSafeNum(sale.receivedCB, tLabel+' (CB)', key);
+        const rawTicket = _bilanSafeNum(sale.receivedTicket, tLabel+' (titre-repas)', key);
+        const baseTotal = r2(rawTotal - (settled ? settled.montant : 0));
+        const baseCash = r2(rawCash - (settled ? settled.montantEspeces : 0));
+        const baseCB = r2(rawCB - (settled ? settled.montantCB : 0));
         entry.revenue += baseTotal;
         if (sign > 0) entry.ticketCount++;
         entry.cash += baseCash;
         entry.cb += baseCB;
-        entry.autres += (parseFloat(sale.receivedTicket)||0);
+        entry.autres += rawTicket;
         (sale.items||[]).forEach(item => {
             if (item.paid === true) return; // ligne de règlement de facture ajoutée au ticket — pas un produit
             const qty = (parseFloat(item.quantity)||0) * sign;
             const lineRevenue = (parseFloat(item.price)||0) * (parseFloat(item.quantity)||0) * sign;
-            const prod = (typeof products !== 'undefined' ? products : []).find(p => p.id === item.id);
-            const cost = (prod && prod.costPrice != null && prod.costPrice !== '') ? parseFloat(prod.costPrice) : null;
-            const lineCost = cost != null ? cost * (parseFloat(item.quantity)||0) * sign : 0;
-            entry.cogs += lineCost;
             const pname = item.name || 'Article';
             const pkey = (item.id != null) ? ('id:'+item.id) : ('name:'+pname);
-            if (!entry.productMap[pkey]) entry.productMap[pkey] = { name:pname, qty:0, revenue:0, cost:0, hasCost:false, unitType:item.unitType||'unit' };
+            if (!entry.productMap[pkey]) entry.productMap[pkey] = { name:pname, qty:0, revenue:0, unitType:item.unitType||'unit' };
             const pe = entry.productMap[pkey];
             pe.qty += qty;
             pe.revenue += lineRevenue;
-            pe.cost += lineCost;
-            if (cost != null) pe.hasCost = true;
         });
     });
 
@@ -8840,13 +8878,14 @@ function _bilanCompute() {
             const key = _bilanKeyOf(p.date);
             if (!key) return;
             const entry = getEntry(key);
-            entry.revenue += (parseFloat(p.montant)||0);
-            entry.cash += (parseFloat(p.montantEspeces)||0);
-            entry.cb += (parseFloat(p.montantCB)||0);
+            const pLabel = 'règlement facture ' + (d.numero || '?');
+            entry.revenue += _bilanSafeNum(p.montant, pLabel+' (montant)', key);
+            entry.cash += _bilanSafeNum(p.montantEspeces, pLabel+' (espèces)', key);
+            entry.cb += _bilanSafeNum(p.montantCB, pLabel+' (CB)', key);
             entry.directSettlements.push({
                 numero: d.numero || '—',
                 client: (d.client && d.client.nom) || '—',
-                montant: parseFloat(p.montant)||0,
+                montant: _bilanSafeNum(p.montant, pLabel+' (montant)', key),
                 mode: p.mode,
                 date: p.date,
                 viaTicket: (p.ticketId !== null && p.ticketId !== undefined),
@@ -8855,9 +8894,33 @@ function _bilanCompute() {
         });
     });
 
+    // 4) Approvisionnements réels (achats/réassorts saisis dans Investissement
+    //    Pro), chacun compté dans le mois de sa propre date d'achat — c'est ce
+    //    montant, et non plus une marge théorique par costPrice, qui vient
+    //    diminuer le chiffre d'affaires pour former le "résultat financier".
+    let appros = [];
+    try { appros = JSON.parse(localStorage.getItem('covo_approvisionnements') || '[]'); } catch(e) { appros = []; }
+    appros.forEach(a => {
+        const key = _bilanKeyOf(a.date || a.datetime);
+        if (!key) return;
+        const entry = getEntry(key);
+        const aLabel = 'approvisionnement #' + (a.numero || a.id || '?');
+        const montant = _bilanSafeNum(a.montant, aLabel, key);
+        entry.appro += montant;
+        entry.approList.push({
+            numero: a.numero || '—',
+            desc: a.desc || '—',
+            fournisseur: a.fournisseur || null,
+            montant: montant,
+            date: a.date || a.datetime,
+            cat: a.cat || null,
+            paiement: a.paiement || null
+        });
+    });
+
     return Object.keys(map).map(key => {
         const e = map[key];
-        e.margin = e.revenue - e.cogs;
+        e.margin = e.revenue - e.appro; // résultat financier = CA − approvisionnement réel du mois
         e.encaisse = e.cash + e.cb + e.autres;
         return e;
     });
@@ -9057,10 +9120,11 @@ window._bilanOpenDetail = function(key) {
     if (statsHost) {
         statsHost.innerHTML = [
             _devisStatCard('💼', _devisFmtEUR(entry.revenue), 'Chiffre d\'affaires', '#2c6fad'),
+            _devisStatCard('📦', _devisFmtEUR(entry.appro), 'Approvisionnement réel', '#c0392b'),
             _devisStatCard('📊', _devisFmtEUR(entry.margin), 'Résultat financier', entry.margin>=0?'#27ae60':'#e74c3c'),
             _devisStatCard('💰', _devisFmtEUR(entry.encaisse), 'Total encaissé', '#8e44ad'),
             _devisStatCard('🧾', entry.ticketCount, 'Ventes', '#e67e22'),
-            _devisStatCard('📦', Object.keys(entry.productMap).length, 'Produits distincts', '#5d7a8c'),
+            _devisStatCard('🏷️', Object.keys(entry.productMap).length, 'Produits distincts', '#5d7a8c'),
         ].join('');
     }
 
@@ -9068,26 +9132,38 @@ window._bilanOpenDetail = function(key) {
         .filter(p => Math.abs(p.qty) > 0.0001 || Math.abs(p.revenue) > 0.001)
         .sort((a,b) => b.qty - a.qty);
     const tbody = document.getElementById('bilan-detail-tbody');
-    let anyMissingCost = false;
     if (tbody) {
         if (!rows.length) {
-            tbody.innerHTML = '<tr><td colspan="4" style="text-align:center;padding:20px;color:var(--text-muted,#888);">Aucun produit vendu ce mois-ci.</td></tr>';
+            tbody.innerHTML = '<tr><td colspan="3" style="text-align:center;padding:20px;color:var(--text-muted,#888);">Aucun produit vendu ce mois-ci.</td></tr>';
         } else {
             tbody.innerHTML = rows.map(p => {
                 const qtyLabel = p.unitType==='kg' ? p.qty.toFixed(3)+' kg' : p.qty.toFixed(p.qty%1===0?0:2);
-                const margeVal = p.hasCost ? (p.revenue - p.cost) : p.revenue;
-                if (!p.hasCost) anyMissingCost = true;
                 return '<tr>'
-                    + '<td><strong style="font-size:0.85rem;">'+_esc(p.name)+'</strong>'+(!p.hasCost?' <span style="color:#e67e22;">†</span>':'')+'</td>'
+                    + '<td><strong style="font-size:0.85rem;">'+_esc(p.name)+'</strong></td>'
                     + '<td style="font-size:0.84rem;">'+qtyLabel+'</td>'
                     + '<td style="font-size:0.84rem;">'+_devisFmtEUR(p.revenue)+'</td>'
-                    + '<td style="font-size:0.84rem;color:'+(margeVal>=0?'#27ae60':'#e74c3c')+';">'+_devisFmtEUR(margeVal)+'</td>'
                     + '</tr>';
             }).join('');
         }
     }
-    const costNote = document.getElementById('bilan-detail-cost-note');
-    if (costNote) costNote.style.display = anyMissingCost ? 'block' : 'none';
+
+    const approWrap = document.getElementById('bilan-detail-appro-wrap');
+    const approList = document.getElementById('bilan-detail-appro-list');
+    if (approWrap && approList) {
+        if (entry.approList.length) {
+            approList.innerHTML = entry.approList.map(a => {
+                const dateTxt = a.date ? new Date(a.date).toLocaleDateString('fr-FR') : '—';
+                const fournTxt = a.fournisseur ? (' · '+_esc(a.fournisseur)) : '';
+                return '<div style="display:flex;align-items:center;justify-content:space-between;gap:10px;padding:8px 12px;background:var(--bg-card-2,#f4f6f9);border-radius:8px;font-size:0.82rem;">'
+                    + '<span>📦 <strong>#'+_esc(a.numero)+'</strong> — '+_esc(a.desc)+' <span style="color:var(--text-muted,#888);">('+dateTxt+fournTxt+')</span></span>'
+                    + '<span><strong style="color:#c0392b;">'+_devisFmtEUR(a.montant)+'</strong></span>'
+                    + '</div>';
+            }).join('');
+            approWrap.style.display = 'block';
+        } else {
+            approWrap.style.display = 'none';
+        }
+    }
 
     const directWrap = document.getElementById('bilan-detail-direct-wrap');
     const directList = document.getElementById('bilan-detail-direct-list');
@@ -9111,9 +9187,24 @@ window._bilanOpenDetail = function(key) {
     openRetourModal('bilan-detail-modal');
 };
 
+function _bilanRenderAnomalyBanner() {
+    const host = document.getElementById('bilan-anomaly-banner');
+    if (!host) return;
+    if (!_bilanLastAnomalies.length) { host.style.display = 'none'; host.innerHTML = ''; return; }
+    const items = _bilanLastAnomalies.slice(0, 6).map(a => {
+        const moisTxt = a.key ? _bilanLabelOf(a.key) : '?';
+        return '<li>'+_esc(moisTxt)+' — '+_esc(a.label)+' : <strong>'+_devisFmtEUR(a.value)+'</strong></li>';
+    }).join('');
+    const more = _bilanLastAnomalies.length > 6 ? ('<div style="margin-top:4px;">… et '+(_bilanLastAnomalies.length-6)+' autre(s).</div>') : '';
+    host.innerHTML = '<div style="font-weight:800;margin-bottom:4px;">⚠️ '+_bilanLastAnomalies.length+' valeur(s) aberrante(s) détectée(s) et ignorée(s) dans le calcul</div>'
+        + '<div style="font-size:0.78rem;">Ces montants dépassent '+_devisFmtEUR(BILAN_SANE_CAP)+' pour une seule transaction — probablement une erreur de saisie ou une donnée corrompue. Ils ont été exclus du bilan pour ne pas fausser les totaux. Vérifiez ces enregistrements :</div>'
+        + '<ul style="margin:6px 0 0 18px;padding:0;font-size:0.78rem;">'+items+'</ul>'+more;
+    host.style.display = 'block';
+}
 function _bilanInit() {
     _bilanMonthsCache = _bilanCompute();
     const sorted = _bilanApplySort(_bilanMonthsCache);
+    _bilanRenderAnomalyBanner();
     _bilanRenderStats(_bilanMonthsCache);
     _bilanRenderTrendChart(_bilanMonthsCache);
     _bilanRenderPaymentChart(_bilanMonthsCache);
@@ -9130,7 +9221,7 @@ function _bilanInit() {
         if (e.key === 'covo_current_user') cpRefreshUserBadge();
         if (['covo_products','covo_categories','covo_promos','covo_users','covo_sales_history','covo_settings','covo_ech_categories'].indexOf(e.key) !== -1) _gstRenderAll();
         if (e.key === 'covo_devis') { var _dp = document.getElementById('gst-devis'); if (_dp && _dp.classList.contains('active') && typeof _devisRenderList === 'function') _devisRenderList(); }
-        if (['covo_sales_history','covo_devis','covo_products'].indexOf(e.key) !== -1) { var _bp = document.getElementById('gst-bilan'); if (_bp && _bp.classList.contains('active') && typeof _bilanInit === 'function') _bilanInit(); }
+        if (['covo_sales_history','covo_devis','covo_products','covo_approvisionnements'].indexOf(e.key) !== -1) { var _bp = document.getElementById('gst-bilan'); if (_bp && _bp.classList.contains('active') && typeof _bilanInit === 'function') _bilanInit(); }
     });
     var savedClientId = localStorage.getItem('gdrive_client_id');
     if (savedClientId) { var inp = document.getElementById('cp-gdrive-client-id'); if (inp) inp.value = savedClientId; }
