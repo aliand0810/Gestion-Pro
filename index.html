@@ -9243,7 +9243,7 @@ function _bilanRenderDetailTickets() {
         const badge = t.cancelled ? ' <span style="color:#e74c3c;font-size:0.68rem;font-weight:700;">🚫 annulé — exclu des totaux</span>' : (t.isReturn ? ' <span style="color:#e67e22;font-size:0.68rem;font-weight:700;">↩ retour</span>' : '');
         const rowStyle = t.cancelled ? 'opacity:0.55;text-decoration:line-through;' : '';
         return '<tr style="'+rowStyle+'">'
-            + '<td><strong style="font-size:0.84rem;">#'+_esc(t.ticketNum)+'</strong>'+badge+'</td>'
+            + '<td><strong style="font-size:0.84rem;">#'+_esc(t.id)+'</strong>'+badge+(t.ticketNum!=null?'<br><span style="font-size:0.65rem;color:var(--text-muted,#aaa);">n° caisse : '+_esc(t.ticketNum)+'</span>':'')+'</td>'
             + '<td style="font-size:0.82rem;">'+dateTxt+'</td>'
             + '<td style="font-size:0.82rem;">'+_esc(t.cashier)+'</td>'
             + '<td style="font-size:0.82rem;">'+_bilanMethodLabel(t.method)+'</td>'
