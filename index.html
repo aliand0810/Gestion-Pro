@@ -1410,7 +1410,8 @@
     <div id="bilan-anomaly-banner" style="display:none;background:#fdf1e8;border:1.5px solid #e38737;color:#7a4a12;border-radius:10px;padding:10px 14px;margin-bottom:14px;"></div>
 
     <div id="bilan-stats-row" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-bottom:6px;"></div>
-    <div style="font-size:0.72rem;color:var(--text-muted,#888);margin-bottom:16px;">💡 Résultat financier = Chiffre d'affaires du mois − montant réel des approvisionnements (achats/réassorts saisis dans Investissement Pro) du même mois.</div>
+    <div style="font-size:0.72rem;color:var(--text-muted,#888);margin-bottom:4px;">💡 Résultat financier = Chiffre d'affaires du mois − montant réel des approvisionnements (achats/réassorts saisis dans Investissement Pro) du même mois.</div>
+    <div style="font-size:0.72rem;color:var(--text-muted,#888);margin-bottom:16px;">💡 Solde disponible en caisse = Total encaissé du mois (argent réellement reçu) − montant réel des approvisionnements du même mois — différent du résultat financier lorsqu'il y a des ventes ou achats à crédit non encore réglés.</div>
 
     <div class="ech-charts-row">
         <div class="ech-chart-card">
@@ -1442,6 +1443,7 @@
                 <th class="ech-th-sort" onclick="window._bilanSortBy('cb')" data-col="cb">💳 Carte bancaire<span class="ech-sort-arrow">↕️</span></th>
                 <th class="ech-th-sort" onclick="window._bilanSortBy('autres')" data-col="autres">Autres<span class="ech-sort-arrow">↕️</span></th>
                 <th class="ech-th-sort" onclick="window._bilanSortBy('encaisse')" data-col="encaisse">Total encaissé<span class="ech-sort-arrow">↕️</span></th>
+                <th class="ech-th-sort" onclick="window._bilanSortBy('soldeCaisse')" data-col="soldeCaisse">💰 Solde disponible en caisse<span class="ech-sort-arrow">↕️</span></th>
             </tr></thead>
             <tbody id="bilan-tbody"></tbody>
         </table>
@@ -9107,6 +9109,10 @@ function _bilanCompute() {
         const e = map[key];
         e.margin = e.revenue - e.appro; // résultat financier = CA − approvisionnement réel du mois
         e.encaisse = e.cash + e.cb + e.autres;
+        // Solde disponible en caisse = argent RÉELLEMENT encaissé ce mois-ci − dépenses
+        // d'approvisionnement RÉELLEMENT effectuées ce mois-ci — différent du résultat
+        // financier (qui part du chiffre d'affaires reconnu, y compris crédit non encaissé).
+        e.soldeCaisse = r2(e.encaisse - e.appro);
         return e;
     });
 }
@@ -9119,6 +9125,7 @@ function _bilanSortValueOf(e, col) {
         case 'cb': return e.cb;
         case 'autres': return e.autres;
         case 'encaisse': return e.encaisse;
+        case 'soldeCaisse': return e.soldeCaisse;
         default: return 0;
     }
 }
@@ -9399,6 +9406,7 @@ function _bilanRenderTable(months) {
     tbody.innerHTML = months.map(e => {
         const margeColor = e.margin >= 0 ? '#27ae60' : '#e74c3c';
         const resteFournColor = e.approResteDu > 0 ? '#c0392b' : 'var(--text-muted,#888)';
+        const soldeCaisseColor = e.soldeCaisse >= 0 ? '#27ae60' : '#e74c3c';
         return '<tr style="cursor:pointer;" onclick="_bilanOpenDetail(\''+e.key+'\')">'
             + '<td><strong style="font-size:0.87rem;">'+_esc(e.label)+'</strong></td>'
             + '<td><strong style="color:'+margeColor+';font-size:0.88rem;">'+_devisFmtEUR(e.margin)+'</strong></td>'
@@ -9407,6 +9415,7 @@ function _bilanRenderTable(months) {
             + '<td style="font-size:0.82rem;">'+_devisFmtEUR(e.cb)+'</td>'
             + '<td style="font-size:0.82rem;color:var(--text-muted,#888);">'+_devisFmtEUR(e.autres)+'</td>'
             + '<td><strong style="font-size:0.88rem;">'+_devisFmtEUR(e.encaisse)+'</strong></td>'
+            + '<td><strong style="color:'+soldeCaisseColor+';font-size:0.88rem;">'+_devisFmtEUR(e.soldeCaisse)+'</strong></td>'
             + '</tr>';
     }).join('');
     _bilanUpdateSortHeaders();
@@ -9604,6 +9613,7 @@ window._bilanOpenDetail = function(key) {
             _devisStatCard('🏦', _devisFmtEUR(entry.approResteDu), 'Reste dû fournisseurs', entry.approResteDu>0?'#c0392b':'#27ae60'),
             _devisStatCard('📊', _devisFmtEUR(entry.margin), 'Résultat financier', entry.margin>=0?'#27ae60':'#e74c3c'),
             _devisStatCard('💰', _devisFmtEUR(entry.encaisse), 'Total encaissé', '#8e44ad'),
+            _devisStatCard('🏛️', _devisFmtEUR(entry.soldeCaisse), 'Solde disponible en caisse', entry.soldeCaisse>=0?'#27ae60':'#e74c3c'),
             _devisStatCard('🧾', entry.ticketCount, 'Ventes', '#e67e22'),
             _devisStatCard('🏷️', Object.keys(entry.productMap).length, 'Produits distincts', '#5d7a8c'),
             _devisStatCard('📒', _devisFmtEUR(entry.loyaltySolde), 'Dette clients fidèles (fin de mois)', entry.loyaltySolde>0?'#d97706':'#27ae60'),
