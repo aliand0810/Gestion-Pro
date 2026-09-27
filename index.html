@@ -1425,12 +1425,19 @@
         </div>
     </div>
 
+    <div class="ech-chart-card" style="margin-bottom:18px;">
+        <div class="ech-chart-title">📒 Dette clients fidèles</div>
+        <div class="ech-chart-sub">12 derniers mois — solde estimé en fin de mois (compte crédit + paiements échelonnés, Fidélité Pro)</div>
+        <div id="bilan-loyalty-chart" style="position:relative;"></div>
+    </div>
+
     <div style="font-size:0.72rem;color:var(--text-muted,#888);margin-bottom:8px;">💡 Cliquez sur un mois pour voir le détail des produits vendus.</div>
     <div class="retours-table-wrap">
         <table class="retours-table" id="bilan-table">
             <thead><tr>
                 <th class="ech-th-sort ech-sort-active" onclick="window._bilanSortBy('mois')" data-col="mois">Mois<span class="ech-sort-arrow">▼</span></th>
                 <th class="ech-th-sort" onclick="window._bilanSortBy('marge')" data-col="marge">Résultat financier<span class="ech-sort-arrow">↕️</span></th>
+                <th class="ech-th-sort" onclick="window._bilanSortBy('resteFournisseurs')" data-col="resteFournisseurs">Reste dû fournisseurs<span class="ech-sort-arrow">↕️</span></th>
                 <th class="ech-th-sort" onclick="window._bilanSortBy('especes')" data-col="especes">💶 Espèces<span class="ech-sort-arrow">↕️</span></th>
                 <th class="ech-th-sort" onclick="window._bilanSortBy('cb')" data-col="cb">💳 Carte bancaire<span class="ech-sort-arrow">↕️</span></th>
                 <th class="ech-th-sort" onclick="window._bilanSortBy('autres')" data-col="autres">Autres<span class="ech-sort-arrow">↕️</span></th>
@@ -1456,6 +1463,7 @@
             <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:18px;padding-bottom:14px;border-bottom:1.5px solid var(--border-color,#eee);">
                 <a href="#bilan-detail-sec-tickets" style="text-decoration:none;font-size:0.76rem;font-weight:700;color:#2c6fad;background:rgba(44,111,173,0.08);padding:5px 12px;border-radius:20px;">🧾 Tickets de caisse <span id="bilan-detail-count-tickets"></span></a>
                 <a href="#bilan-detail-sec-appro" style="text-decoration:none;font-size:0.76rem;font-weight:700;color:#c0392b;background:rgba(192,57,43,0.08);padding:5px 12px;border-radius:20px;">📦 Approvisionnements <span id="bilan-detail-count-appro"></span></a>
+                <a href="#bilan-detail-sec-loyalty" style="text-decoration:none;font-size:0.76rem;font-weight:700;color:#d97706;background:rgba(217,119,6,0.08);padding:5px 12px;border-radius:20px;">📒 Dette clients fidèles <span id="bilan-detail-count-loyalty"></span></a>
                 <a href="#bilan-detail-sec-produits" style="text-decoration:none;font-size:0.76rem;font-weight:700;color:#5d7a8c;background:rgba(93,122,140,0.08);padding:5px 12px;border-radius:20px;">🏷️ Produits vendus <span id="bilan-detail-count-produits"></span></a>
                 <a href="#bilan-detail-sec-factures" id="bilan-detail-jump-factures" style="display:none;text-decoration:none;font-size:0.76rem;font-weight:700;color:#8e44ad;background:rgba(142,68,173,0.08);padding:5px 12px;border-radius:20px;">💰 Règlements de factures <span id="bilan-detail-count-factures"></span></a>
             </div>
@@ -1490,11 +1498,30 @@
                             <th>Description</th>
                             <th class="ech-th-sort" onclick="window._bilanDetailSortAppro('fournisseur')" data-col="fournisseur">Fournisseur<span class="ech-sort-arrow">↕️</span></th>
                             <th class="ech-th-sort" onclick="window._bilanDetailSortAppro('montant')" data-col="montant">Montant<span class="ech-sort-arrow">↕️</span></th>
+                            <th class="ech-th-sort" onclick="window._bilanDetailSortAppro('resteADoit')" data-col="resteADoit">Reste dû<span class="ech-sort-arrow">↕️</span></th>
                         </tr></thead>
                         <tbody id="bilan-detail-appro-tbody"></tbody>
                     </table>
                 </div>
                 <div id="bilan-detail-appro-empty" style="display:none;text-align:center;padding:18px;color:var(--text-muted,#888);font-size:0.82rem;">Aucun approvisionnement ce mois-ci.</div>
+            </div>
+
+            <!-- Dette liée aux clients fidèles (compte crédit + échéancier, Fidélité Pro) -->
+            <div id="bilan-detail-sec-loyalty" style="margin-bottom:24px;">
+                <div style="font-weight:800;font-size:0.9rem;margin-bottom:8px;">📒 Dette clients fidèles <span style="font-weight:400;font-size:0.72rem;color:var(--text-muted,#888);">(compte crédit &amp; paiements échelonnés suivis dans Fidélité Pro)</span></div>
+                <div id="bilan-detail-loyalty-summary" style="display:flex;gap:16px;flex-wrap:wrap;margin-bottom:10px;font-size:0.8rem;"></div>
+                <div class="retours-table-wrap">
+                    <table class="retours-table" id="bilan-detail-loyalty-table">
+                        <thead><tr>
+                            <th class="ech-th-sort ech-sort-active" onclick="window._bilanDetailSortLoyalty('date')" data-col="date">Date<span class="ech-sort-arrow">▼</span></th>
+                            <th class="ech-th-sort" onclick="window._bilanDetailSortLoyalty('client')" data-col="client">Client<span class="ech-sort-arrow">↕️</span></th>
+                            <th>Mouvement</th>
+                            <th class="ech-th-sort" onclick="window._bilanDetailSortLoyalty('amount')" data-col="amount">Montant<span class="ech-sort-arrow">↕️</span></th>
+                        </tr></thead>
+                        <tbody id="bilan-detail-loyalty-tbody"></tbody>
+                    </table>
+                </div>
+                <div id="bilan-detail-loyalty-empty" style="display:none;text-align:center;padding:18px;color:var(--text-muted,#888);font-size:0.82rem;">Aucun mouvement de dette client ce mois-ci.</div>
             </div>
 
             <div id="bilan-detail-sec-produits" style="margin-bottom:24px;">
@@ -8854,7 +8881,8 @@ function _bilanLabelOf(key) {
     return (_BILAN_MOIS_FR[m]||'?') + ' ' + y;
 }
 function _bilanNewEntry(key) {
-    return { key, label:_bilanLabelOf(key), revenue:0, appro:0, approList:[], cash:0, cb:0, autres:0, ticketCount:0, productMap:{}, directSettlements:[], ticketsList:[] };
+    return { key, label:_bilanLabelOf(key), revenue:0, appro:0, approList:[], approResteDu:0, cash:0, cb:0, autres:0, ticketCount:0, productMap:{}, directSettlements:[], ticketsList:[],
+        loyaltyAccordee:0, loyaltyReglee:0, loyaltyAjustementNet:0, loyaltyList:[], loyaltySolde:0 };
 }
 function _bilanCompute() {
     const map = {};
@@ -8992,6 +9020,14 @@ function _bilanCompute() {
         const aLabel = 'approvisionnement #' + (a.numero || a.id || '?');
         const montant = _bilanSafeNum(a.montant, aLabel, key, { store:'covo_approvisionnements', id:a.id, field:'montant' });
         entry.appro += montant;
+        // Reste dû au fournisseur (achats à crédit non soldés) : valeur LIVE de resteADoit
+        // (tenue à jour par Investissement Pro à chaque paiement/dette ajouté), pas une
+        // reconstruction historique — donc toujours exacte, comme le montant lui-même.
+        let resteADoit = null;
+        if (a.paiement === 'credit') {
+            resteADoit = _bilanSafeNum(a.resteADoit, aLabel + ' (reste dû)', key, { store:'covo_approvisionnements', id:a.id, field:'resteADoit' });
+            entry.approResteDu += resteADoit;
+        }
         entry.approList.push({
             numero: a.numero || '—',
             desc: a.desc || '—',
@@ -8999,9 +9035,73 @@ function _bilanCompute() {
             montant: montant,
             date: a.date || a.datetime,
             cat: a.cat || null,
-            paiement: a.paiement || null
+            paiement: a.paiement || null,
+            resteADoit: resteADoit
         });
     });
+
+    // 5) Dette liée aux clients fidèles (compte crédit + paiements échelonnés, suivis
+    //    dans Fidélité Pro : covo_loyalty.customers[].credit / .history[]). Chaque
+    //    mouvement (achat à crédit, règlement, retour marchandise, ajustement manuel)
+    //    est compté dans le mois de sa propre date, exactement comme les approvisionnements
+    //    ci-dessus. Le "solde de fin de mois" est en revanche une RECONSTRUCTION : on part
+    //    du solde réel actuel (somme des c.credit en cours, toujours exact) pour le mois le
+    //    plus récent, puis on remonte mois par mois en arrière via les variations nettes
+    //    réellement enregistrées — les mois les plus anciens sont donc une estimation
+    //    (l'historique par client dans Fidélité Pro est limité aux 300 derniers mouvements).
+    let loyaltyData = { customers: [] };
+    try { loyaltyData = JSON.parse(localStorage.getItem('covo_loyalty') || '{"customers":[]}'); } catch(e) { loyaltyData = { customers: [] }; }
+    const loyaltyCustomers = Array.isArray(loyaltyData.customers) ? loyaltyData.customers : [];
+    const LOYALTY_LEDGER_TYPES = ['credit_purchase','credit_repay','credit_adjust','credit_return','echel_purchase','echel_repay'];
+    let loyaltyLiveTotal = 0;
+    const loyaltyMonthlyNet = {}; // clé mois -> variation nette (tous clients confondus)
+    loyaltyCustomers.forEach(c => {
+        loyaltyLiveTotal += (parseFloat(c.credit) || 0);
+        const relevant = (c.history || []).filter(h => LOYALTY_LEDGER_TYPES.indexOf(h.type) !== -1);
+        // L'historique est stocké du plus récent au plus ancien (unshift) — on le rejoue
+        // en ordre chronologique pour calculer un solde courant par client et interpréter
+        // correctement le signe des ajustements manuels (voir credit_adjust ci-dessous).
+        const chrono = relevant.slice().sort((a,b) => new Date(a.date) - new Date(b.date));
+        let running = 0;
+        chrono.forEach(h => {
+            const key = _bilanKeyOf(h.date);
+            const hLabel = 'mouvement crédit — ' + (c.name || c.id || 'client');
+            const amount = _bilanSafeNum(h.amount, hLabel, key, null);
+            let delta = 0, kind = 'ajustement';
+            if (h.type === 'credit_purchase' || h.type === 'echel_purchase') { delta = amount; kind = 'accordee'; }
+            else if (h.type === 'credit_repay' || h.type === 'credit_return' || h.type === 'echel_repay') { delta = -amount; kind = 'reglee'; }
+            else if (h.type === 'credit_adjust') {
+                // Note générée par Fidélité Pro au format exact "Ajustement dette → X€" —
+                // on en extrait la valeur cible pour retrouver le vrai signe du mouvement
+                // (ltyAdjustDebt() n'enregistre que |delta| dans amount, jamais le signe).
+                const m = /→\s*([\d]+(?:[.,]\d+)?)\s*€/.exec(h.note || '');
+                delta = m ? (parseFloat(m[1].replace(',', '.')) || 0) - running : 0;
+            }
+            running = r2(running + delta);
+            if (!key) return;
+            const entry = getEntry(key);
+            if (kind === 'accordee') entry.loyaltyAccordee += amount;
+            else if (kind === 'reglee') entry.loyaltyReglee += amount;
+            else entry.loyaltyAjustementNet = r2(entry.loyaltyAjustementNet + delta);
+            entry.loyaltyList.push({
+                date: h.date,
+                client: c.name || '—',
+                type: h.type,
+                amount: kind === 'reglee' ? -amount : (kind === 'ajustement' ? delta : amount),
+                note: h.note || null
+            });
+            loyaltyMonthlyNet[key] = r2((loyaltyMonthlyNet[key] || 0) + delta);
+        });
+    });
+    // Reconstruction du solde de fin de mois : ancré sur le solde réel actuel pour le
+    // mois le plus récent connu, puis remonté en arrière via les variations mensuelles.
+    const _loyaltyKeysSorted = Object.keys(map).sort();
+    let _loyaltyRunning = loyaltyLiveTotal;
+    for (let i = _loyaltyKeysSorted.length - 1; i >= 0; i--) {
+        const k = _loyaltyKeysSorted[i];
+        map[k].loyaltySolde = Math.max(0, r2(_loyaltyRunning));
+        _loyaltyRunning = r2(_loyaltyRunning - (loyaltyMonthlyNet[k] || 0));
+    }
 
     return Object.keys(map).map(key => {
         const e = map[key];
@@ -9014,6 +9114,7 @@ function _bilanSortValueOf(e, col) {
     switch (col) {
         case 'mois': return e.key;
         case 'marge': return e.margin;
+        case 'resteFournisseurs': return e.approResteDu;
         case 'especes': return e.cash;
         case 'cb': return e.cb;
         case 'autres': return e.autres;
@@ -9171,6 +9272,76 @@ function _bilanRenderPaymentChart(months) {
     host.innerHTML = '<div class="ech-status-bar-track">'+track+'</div><div class="ech-legend" style="margin-top:10px;">'+legend+'</div>';
 }
 
+// ── Graphique "Dette clients fidèles" : tendance mensuelle du solde estimé en fin de
+//    mois (compte crédit + échelonné), avec la dette nouvellement accordée en repère ──
+function _bilanRenderLoyaltyChart(months) {
+    const host = document.getElementById('bilan-loyalty-chart');
+    if (!host) return;
+    const chrono = months.slice().sort((a,b) => a.key<b.key?-1:a.key>b.key?1:0).slice(-12);
+    const hasAny = chrono.some(e => (e.loyaltySolde||0) > 0.001 || (e.loyaltyAccordee||0) > 0.001 || (e.loyaltyReglee||0) > 0.001);
+    if (!chrono.length || !hasAny) { host.innerHTML = '<div style="padding:28px 0;text-align:center;color:var(--text-muted,#95a5a6);font-size:0.8rem;">Aucune dette client fidèle enregistrée</div>'; return; }
+    const W=600, H=210, padL=42, padR=16, padT=16, padB=30;
+    const plotW=W-padL-padR, plotH=H-padT-padB;
+    const n = chrono.length;
+    const scale = _bilanNiceScale(chrono.map(e=>e.loyaltySolde||0).concat(chrono.map(e=>e.loyaltyAccordee||0)));
+    const xAt = i => padL + (n<=1?0:(plotW*i/(n-1)));
+    const yAt = v => padT + plotH - (plotH*(Math.max(scale.lo,Math.min(scale.hi,v))-scale.lo)/(scale.hi-scale.lo || 1));
+
+    const gridLines = [0,0.5,1].map(f => {
+        const y = padT + plotH - plotH*f;
+        const val = Math.round(scale.lo + (scale.hi-scale.lo)*f);
+        return '<line x1="'+padL+'" y1="'+y+'" x2="'+(W-padR)+'" y2="'+y+'" stroke="var(--border-color,#e0e0e0)" stroke-width="1"/>'
+             + '<text x="'+(padL-6)+'" y="'+(y+3)+'" text-anchor="end" font-size="9" fill="var(--text-muted,#95a5a6)">'+val+' €</text>';
+    }).join('');
+    const xLabels = chrono.map((e,i) => '<text x="'+xAt(i)+'" y="'+(H-8)+'" text-anchor="middle" font-size="9" fill="var(--text-muted,#95a5a6)">'+e.key.slice(2)+'</text>').join('');
+    const soldePts = chrono.map((e,i) => xAt(i)+','+yAt(e.loyaltySolde||0)).join(' ');
+    const accordeePts = chrono.map((e,i) => xAt(i)+','+yAt(e.loyaltyAccordee||0)).join(' ');
+    const lastI = n-1;
+
+    host.innerHTML =
+        '<svg viewBox="0 0 '+W+' '+H+'" style="width:100%;height:auto;display:block;overflow:visible;" id="bilan-loyalty-svg">'
+        + gridLines + xLabels
+        + '<polyline points="'+soldePts+'" fill="none" stroke="#d97706" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>'
+        + '<polyline points="'+accordeePts+'" fill="none" stroke="#8e44ad" stroke-width="2" stroke-dasharray="5,4" stroke-linejoin="round" stroke-linecap="round"/>'
+        + '<circle cx="'+xAt(lastI)+'" cy="'+yAt(chrono[lastI].loyaltySolde||0)+'" r="5" fill="#d97706" stroke="var(--bg-card,#fff)" stroke-width="2"/>'
+        + '<circle cx="'+xAt(lastI)+'" cy="'+yAt(chrono[lastI].loyaltyAccordee||0)+'" r="5" fill="#8e44ad" stroke="var(--bg-card,#fff)" stroke-width="2"/>'
+        + '<line id="bilan-loyalty-crosshair" x1="0" y1="'+padT+'" x2="0" y2="'+(padT+plotH)+'" stroke="var(--text-muted,#95a5a6)" stroke-width="1" opacity="0"/>'
+        + '<rect id="bilan-loyalty-hitrect" x="'+padL+'" y="'+padT+'" width="'+plotW+'" height="'+plotH+'" fill="transparent"/>'
+        + '</svg>'
+        + '<div class="ech-tooltip" id="bilan-loyalty-tooltip"></div>'
+        + '<div class="ech-legend">'
+        +   '<span class="ech-legend-item"><span class="ech-legend-line" style="border-color:#d97706;"></span>Solde estimé (fin de mois)</span>'
+        +   '<span class="ech-legend-item"><span class="ech-legend-line dashed" style="border-color:#8e44ad;"></span>Dette accordée ce mois</span>'
+        + '</div>';
+
+    const svgEl = document.getElementById('bilan-loyalty-svg');
+    const hit = document.getElementById('bilan-loyalty-hitrect');
+    const crosshair = document.getElementById('bilan-loyalty-crosshair');
+    const tooltip = document.getElementById('bilan-loyalty-tooltip');
+    if (hit && svgEl && tooltip && crosshair) {
+        const showAt = (clientX) => {
+            const rect = svgEl.getBoundingClientRect();
+            const scaleX = W/rect.width;
+            const localX = (clientX-rect.left)*scaleX;
+            let idx=0, best=Infinity;
+            chrono.forEach((e,i)=>{ const dx=Math.abs(xAt(i)-localX); if(dx<best){best=dx;idx=i;} });
+            const bx = xAt(idx);
+            crosshair.setAttribute('x1', bx); crosshair.setAttribute('x2', bx); crosshair.setAttribute('opacity','1');
+            const e = chrono[idx];
+            tooltip.innerHTML = '<strong>'+_esc(e.label)+'</strong><br>'
+                + '<span style="color:#f0b876;">●</span> Solde estimé : <strong>'+_devisFmtEUR(e.loyaltySolde||0)+'</strong><br>'
+                + '<span style="color:#c58fd6;">●</span> Accordée : <strong>'+_devisFmtEUR(e.loyaltyAccordee||0)+'</strong><br>'
+                + '<span style="color:#7fd6ab;">●</span> Réglée : <strong>'+_devisFmtEUR(e.loyaltyReglee||0)+'</strong>';
+            const px = (bx/W)*rect.width;
+            tooltip.style.left = Math.min(Math.max(px-45,0), Math.max(rect.width-150,0)) + 'px';
+            tooltip.style.top = '4px';
+            tooltip.classList.add('show');
+        };
+        hit.addEventListener('pointermove', e => showAt(e.clientX));
+        hit.addEventListener('pointerleave', () => { crosshair.setAttribute('opacity','0'); tooltip.classList.remove('show'); });
+    }
+}
+
 function _bilanRenderTable(months) {
     const tbody = document.getElementById('bilan-tbody');
     const emptyEl = document.getElementById('bilan-empty');
@@ -9183,9 +9354,11 @@ function _bilanRenderTable(months) {
     if (emptyEl) emptyEl.style.display = 'none';
     tbody.innerHTML = months.map(e => {
         const margeColor = e.margin >= 0 ? '#27ae60' : '#e74c3c';
+        const resteFournColor = e.approResteDu > 0 ? '#c0392b' : 'var(--text-muted,#888)';
         return '<tr style="cursor:pointer;" onclick="_bilanOpenDetail(\''+e.key+'\')">'
             + '<td><strong style="font-size:0.87rem;">'+_esc(e.label)+'</strong></td>'
             + '<td><strong style="color:'+margeColor+';font-size:0.88rem;">'+_devisFmtEUR(e.margin)+'</strong></td>'
+            + '<td style="font-size:0.82rem;color:'+resteFournColor+';'+(e.approResteDu>0?'font-weight:700;':'')+'">'+_devisFmtEUR(e.approResteDu)+'</td>'
             + '<td style="font-size:0.82rem;">'+_devisFmtEUR(e.cash)+'</td>'
             + '<td style="font-size:0.82rem;">'+_devisFmtEUR(e.cb)+'</td>'
             + '<td style="font-size:0.82rem;color:var(--text-muted,#888);">'+_devisFmtEUR(e.autres)+'</td>'
@@ -9262,6 +9435,7 @@ function _bilanApproSortValue(a, col) {
         case 'numero': return a.numero || '';
         case 'fournisseur': return (a.fournisseur||'').toLowerCase();
         case 'montant': return a.montant;
+        case 'resteADoit': return a.resteADoit || 0;
         default: return 0;
     }
 }
@@ -9295,15 +9469,80 @@ function _bilanRenderDetailAppro() {
     if (emptyEl) emptyEl.style.display = 'none';
     tbody.innerHTML = list.map(a => {
         const dateTxt = a.date ? new Date(a.date).toLocaleDateString('fr-FR') : '—';
+        const resteTxt = a.resteADoit != null ? _devisFmtEUR(a.resteADoit) : '—';
+        const resteColor = (a.resteADoit != null && a.resteADoit > 0) ? '#c0392b' : 'var(--text-muted,#888)';
         return '<tr>'
             + '<td style="font-size:0.82rem;">'+dateTxt+'</td>'
             + '<td style="font-size:0.82rem;">#'+_esc(a.numero)+'</td>'
             + '<td style="font-size:0.84rem;">'+_esc(a.desc)+'</td>'
             + '<td style="font-size:0.82rem;">'+_esc(a.fournisseur||'—')+'</td>'
             + '<td style="font-size:0.85rem;font-weight:700;color:#c0392b;">'+_devisFmtEUR(a.montant)+'</td>'
+            + '<td style="font-size:0.85rem;font-weight:'+(a.resteADoit>0?'700':'400')+';color:'+resteColor+';">'+resteTxt+'</td>'
             + '</tr>';
     }).join('');
     _bilanUpdateApproSortHeaders();
+}
+
+// ── Tableau "Dette clients fidèles" de la modale détail ──
+let _bilanLoyaltySort = {col:'date', dir:'desc'};
+function _bilanLoyaltySortValue(h, col) {
+    switch (col) {
+        case 'date': return h.date || '';
+        case 'client': return (h.client||'').toLowerCase();
+        case 'amount': return h.amount;
+        default: return 0;
+    }
+}
+function _bilanApplyLoyaltySort(list) {
+    const col = _bilanLoyaltySort.col, dir = _bilanLoyaltySort.dir, mult = dir==='asc'?1:-1;
+    return list.slice().sort((a,b) => {
+        const av = _bilanLoyaltySortValue(a,col), bv = _bilanLoyaltySortValue(b,col);
+        if (av<bv) return -1*mult; if (av>bv) return 1*mult; return 0;
+    });
+}
+window._bilanDetailSortLoyalty = function(col) {
+    if (_bilanLoyaltySort.col === col) { _bilanLoyaltySort.dir = _bilanLoyaltySort.dir==='asc'?'desc':'asc'; }
+    else { _bilanLoyaltySort.col = col; _bilanLoyaltySort.dir = col==='amount'?'desc':'asc'; }
+    _bilanRenderDetailLoyalty();
+};
+function _bilanUpdateLoyaltySortHeaders() {
+    document.querySelectorAll('#bilan-detail-loyalty-table .ech-th-sort').forEach(th => {
+        const col = th.getAttribute('data-col');
+        const arrow = th.querySelector('.ech-sort-arrow');
+        if (col === _bilanLoyaltySort.col) { th.classList.add('ech-sort-active'); if (arrow) arrow.textContent = _bilanLoyaltySort.dir==='asc'?'▲':'▼'; }
+        else { th.classList.remove('ech-sort-active'); if (arrow) arrow.textContent = '↕️'; }
+    });
+}
+const _bilanLoyaltyTypeLabel = t => t==='credit_purchase'?'📒 Achat à crédit':t==='credit_repay'?'💵 Règlement crédit':t==='credit_return'?'↩️ Retour marchandise':t==='credit_adjust'?'✎ Ajustement':t==='echel_purchase'?'📅 Achat échelonné':t==='echel_repay'?'💳 Règlement échéance':'—';
+function _bilanRenderDetailLoyalty() {
+    if (!_bilanDetailEntry) return;
+    const summaryHost = document.getElementById('bilan-detail-loyalty-summary');
+    if (summaryHost) {
+        const e = _bilanDetailEntry;
+        summaryHost.innerHTML = ''
+            + '<span>➕ Dette accordée : <strong style="color:#d97706;">'+_devisFmtEUR(e.loyaltyAccordee)+'</strong></span>'
+            + '<span>✅ Réglée : <strong style="color:#27ae60;">'+_devisFmtEUR(e.loyaltyReglee)+'</strong></span>'
+            + (Math.abs(e.loyaltyAjustementNet||0) > 0.001 ? '<span>✎ Ajustements : <strong style="color:#6366f1;">'+_devisFmtEUR(e.loyaltyAjustementNet)+'</strong></span>' : '')
+            + '<span>📒 Solde estimé fin de mois : <strong style="color:'+(e.loyaltySolde>0?'#d97706':'#27ae60')+';">'+_devisFmtEUR(e.loyaltySolde)+'</strong></span>';
+    }
+    const list = _bilanApplyLoyaltySort(_bilanDetailEntry.loyaltyList || []);
+    const tbody = document.getElementById('bilan-detail-loyalty-tbody');
+    const emptyEl = document.getElementById('bilan-detail-loyalty-empty');
+    if (!tbody) return;
+    if (!list.length) { tbody.innerHTML = ''; if (emptyEl) emptyEl.style.display = 'block'; _bilanUpdateLoyaltySortHeaders(); return; }
+    if (emptyEl) emptyEl.style.display = 'none';
+    tbody.innerHTML = list.map(h => {
+        const dateTxt = h.date ? new Date(h.date).toLocaleDateString('fr-FR') : '—';
+        const amtColor = h.amount > 0 ? '#d97706' : (h.amount < 0 ? '#27ae60' : 'var(--text-muted,#888)');
+        const amtTxt = (h.amount > 0 ? '+' : '') + _devisFmtEUR(h.amount);
+        return '<tr>'
+            + '<td style="font-size:0.82rem;">'+dateTxt+'</td>'
+            + '<td style="font-size:0.84rem;">'+_esc(h.client)+'</td>'
+            + '<td style="font-size:0.82rem;">'+_bilanLoyaltyTypeLabel(h.type)+(h.note?' <span style="color:var(--text-muted,#aaa);font-size:0.7rem;">('+_esc(h.note)+')</span>':'')+'</td>'
+            + '<td style="font-size:0.85rem;font-weight:700;color:'+amtColor+';">'+amtTxt+'</td>'
+            + '</tr>';
+    }).join('');
+    _bilanUpdateLoyaltySortHeaders();
 }
 
 window._bilanOpenDetail = function(key) {
@@ -9318,10 +9557,12 @@ window._bilanOpenDetail = function(key) {
         statsHost.innerHTML = [
             _devisStatCard('💼', _devisFmtEUR(entry.revenue), 'Chiffre d\'affaires', '#2c6fad'),
             _devisStatCard('📦', _devisFmtEUR(entry.appro), 'Approvisionnement réel', '#c0392b'),
+            _devisStatCard('🏦', _devisFmtEUR(entry.approResteDu), 'Reste dû fournisseurs', entry.approResteDu>0?'#c0392b':'#27ae60'),
             _devisStatCard('📊', _devisFmtEUR(entry.margin), 'Résultat financier', entry.margin>=0?'#27ae60':'#e74c3c'),
             _devisStatCard('💰', _devisFmtEUR(entry.encaisse), 'Total encaissé', '#8e44ad'),
             _devisStatCard('🧾', entry.ticketCount, 'Ventes', '#e67e22'),
             _devisStatCard('🏷️', Object.keys(entry.productMap).length, 'Produits distincts', '#5d7a8c'),
+            _devisStatCard('📒', _devisFmtEUR(entry.loyaltySolde), 'Dette clients fidèles (fin de mois)', entry.loyaltySolde>0?'#d97706':'#27ae60'),
         ].join('');
     }
 
@@ -9329,11 +9570,13 @@ window._bilanOpenDetail = function(key) {
     const setCount = (id, n) => { const el = document.getElementById(id); if (el) el.textContent = '('+n+')'; };
     setCount('bilan-detail-count-tickets', (entry.ticketsList||[]).length);
     setCount('bilan-detail-count-appro', (entry.approList||[]).length);
+    setCount('bilan-detail-count-loyalty', (entry.loyaltyList||[]).length);
     setCount('bilan-detail-count-produits', Object.keys(entry.productMap).length);
     setCount('bilan-detail-count-factures', (entry.directSettlements||[]).length);
 
     _bilanRenderDetailTickets();
     _bilanRenderDetailAppro();
+    _bilanRenderDetailLoyalty();
 
     const rows = Object.values(entry.productMap)
         .filter(p => Math.abs(p.qty) > 0.0001 || Math.abs(p.revenue) > 0.001)
@@ -9477,6 +9720,7 @@ function _bilanInit() {
     _bilanRenderStats(_bilanMonthsCache);
     _bilanRenderTrendChart(_bilanMonthsCache);
     _bilanRenderPaymentChart(_bilanMonthsCache);
+    _bilanRenderLoyaltyChart(_bilanMonthsCache);
     _bilanRenderTable(sorted);
 }
 
@@ -9490,7 +9734,7 @@ function _bilanInit() {
         if (e.key === 'covo_current_user') cpRefreshUserBadge();
         if (['covo_products','covo_categories','covo_promos','covo_users','covo_sales_history','covo_settings','covo_ech_categories'].indexOf(e.key) !== -1) _gstRenderAll();
         if (e.key === 'covo_devis') { var _dp = document.getElementById('gst-devis'); if (_dp && _dp.classList.contains('active') && typeof _devisRenderList === 'function') _devisRenderList(); }
-        if (['covo_sales_history','covo_devis','covo_products','covo_approvisionnements'].indexOf(e.key) !== -1) { var _bp = document.getElementById('gst-bilan'); if (_bp && _bp.classList.contains('active') && typeof _bilanInit === 'function') _bilanInit(); }
+        if (['covo_sales_history','covo_devis','covo_products','covo_approvisionnements','covo_loyalty'].indexOf(e.key) !== -1) { var _bp = document.getElementById('gst-bilan'); if (_bp && _bp.classList.contains('active') && typeof _bilanInit === 'function') _bilanInit(); }
     });
     var savedClientId = localStorage.getItem('gdrive_client_id');
     if (savedClientId) { var inp = document.getElementById('cp-gdrive-client-id'); if (inp) inp.value = savedClientId; }
