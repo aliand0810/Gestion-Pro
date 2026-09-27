@@ -1419,8 +1419,8 @@
             <div id="bilan-trend-chart" style="position:relative;"></div>
         </div>
         <div class="ech-chart-card">
-            <div class="ech-chart-title">📊 Ventilation des paiements</div>
-            <div class="ech-chart-sub">Cumul sur les mois listés ci-dessous</div>
+            <div class="ech-chart-title">📦 Approvisionnements : dépensé &amp; reste dû</div>
+            <div class="ech-chart-sub">12 derniers mois — la ventilation par mode de paiement (espèces/CB/autres) reste visible dans le tableau ci-dessous</div>
             <div id="bilan-payment-chart" style="position:relative;"></div>
         </div>
     </div>
@@ -9248,28 +9248,72 @@ function _bilanRenderTrendChart(months) {
     }
 }
 
+// ── Graphique "Approvisionnements : dépensé & reste dû" — barres groupées mois par
+//    mois (remplace l'ancienne ventilation cumulée par mode de paiement, celle-ci
+//    reste visible telle quelle dans les colonnes Espèces/CB/Autres du tableau) ──
 function _bilanRenderPaymentChart(months) {
     const host = document.getElementById('bilan-payment-chart');
     if (!host) return;
-    const cash = months.reduce((s,e)=>s+e.cash,0);
-    const cb = months.reduce((s,e)=>s+e.cb,0);
-    const autres = months.reduce((s,e)=>s+e.autres,0);
-    const total = cash+cb+autres;
-    if (total <= 0) { host.innerHTML = '<div style="padding:28px 0;text-align:center;color:var(--text-muted,#95a5a6);font-size:0.8rem;">Aucun encaissement</div>'; return; }
-    const segs = [
-        {label:'Espèces', color:'#2c6fad', icon:'💶', val:cash},
-        {label:'Carte bancaire', color:'#e38737', icon:'💳', val:cb},
-        {label:'Autres', color:'#95a5a6', icon:'🎫', val:autres},
-    ];
-    const track = segs.filter(s=>s.val>0).map(s => {
-        const pct = (s.val/total*100);
-        return '<div class="ech-status-bar-seg" style="width:'+pct+'%;background:'+s.color+';" title="'+s.label+' : '+_devisFmtEUR(s.val)+' ('+pct.toFixed(0)+'%)"></div>';
+    const chrono = months.slice().sort((a,b) => a.key<b.key?-1:a.key>b.key?1:0).slice(-12);
+    const hasAny = chrono.some(e => (e.appro||0) > 0.001 || (e.approResteDu||0) > 0.001);
+    if (!chrono.length || !hasAny) { host.innerHTML = '<div style="padding:28px 0;text-align:center;color:var(--text-muted,#95a5a6);font-size:0.8rem;">Aucun approvisionnement enregistré</div>'; return; }
+    const W=600, H=210, padL=42, padR=16, padT=16, padB=30;
+    const plotW=W-padL-padR, plotH=H-padT-padB;
+    const n = chrono.length;
+    const maxVal = Math.max(1, ...chrono.map(e=>e.appro||0), ...chrono.map(e=>e.approResteDu||0));
+    const niceMax = _echNiceMax(maxVal);
+    const xAt = i => padL + (plotW*(i+0.5)/n);
+    const yAt = v => padT + plotH - (plotH*Math.min(v,niceMax)/(niceMax||1));
+    const groupW = plotW/n;
+    const bw = Math.min(16, groupW*0.32);
+    const gap = 3;
+
+    const gridLines = [0,0.25,0.5,0.75,1].map(f => {
+        const y = padT + plotH - plotH*f;
+        const val = Math.round(niceMax*f);
+        return '<line x1="'+padL+'" y1="'+y+'" x2="'+(W-padR)+'" y2="'+y+'" stroke="var(--border-color,#e0e0e0)" stroke-width="1"/>'
+             + '<text x="'+(padL-6)+'" y="'+(y+3)+'" text-anchor="end" font-size="9" fill="var(--text-muted,#95a5a6)">'+(val>=1000?(val/1000).toFixed(1)+'k':val)+' €</text>';
     }).join('');
-    const legend = segs.map(s => {
-        const pct = (s.val/total*100).toFixed(0);
-        return '<span class="ech-legend-item"><span class="ech-legend-swatch" style="background:'+s.color+';"></span>'+s.icon+' '+s.label+' : <strong style="color:var(--text-main,#2c3e50);">'+_devisFmtEUR(s.val)+'</strong> ('+pct+'%)</span>';
+    const bars = chrono.map((e,i) => {
+        const cx = xAt(i);
+        const yD = yAt(e.appro||0), hD = (padT+plotH)-yD;
+        const yR = yAt(e.approResteDu||0), hR = (padT+plotH)-yR;
+        return '<rect data-i="'+i+'" x="'+(cx-gap/2-bw)+'" y="'+yD+'" width="'+bw+'" height="'+Math.max(hD,1)+'" rx="2" fill="#2c6fad"/>'
+             + '<rect data-i="'+i+'" x="'+(cx+gap/2)+'" y="'+yR+'" width="'+bw+'" height="'+Math.max(hR,1)+'" rx="2" fill="#c0392b"/>';
     }).join('');
-    host.innerHTML = '<div class="ech-status-bar-track">'+track+'</div><div class="ech-legend" style="margin-top:10px;">'+legend+'</div>';
+    const xLabels = chrono.map((e,i) => '<text x="'+xAt(i)+'" y="'+(H-8)+'" text-anchor="middle" font-size="9" fill="var(--text-muted,#95a5a6)">'+e.key.slice(2)+'</text>').join('');
+
+    host.innerHTML =
+        '<svg viewBox="0 0 '+W+' '+H+'" style="width:100%;height:auto;display:block;overflow:visible;" id="bilan-payment-svg">'
+        + gridLines + bars + xLabels
+        + '</svg>'
+        + '<div class="ech-tooltip" id="bilan-payment-tooltip"></div>'
+        + '<div class="ech-legend">'
+        +   '<span class="ech-legend-item"><span class="ech-legend-swatch" style="background:#2c6fad;"></span>Dépensé (approvisionnement réel)</span>'
+        +   '<span class="ech-legend-item"><span class="ech-legend-swatch" style="background:#c0392b;"></span>Reste dû (achats à crédit)</span>'
+        + '</div>';
+
+    const svgEl = document.getElementById('bilan-payment-svg');
+    const tooltip = document.getElementById('bilan-payment-tooltip');
+    if (svgEl && tooltip) {
+        svgEl.querySelectorAll('rect[data-i]').forEach(rect => {
+            const i = parseInt(rect.getAttribute('data-i'), 10);
+            const e = chrono[i];
+            rect.addEventListener('pointermove', ev => {
+                const rectBB = svgEl.getBoundingClientRect();
+                const scaleX = W/rectBB.width;
+                const localX = (ev.clientX-rectBB.left)*scaleX;
+                tooltip.innerHTML = '<strong>'+_esc(e.label)+'</strong><br>'
+                    + '<span style="color:#7fb2e0;">●</span> Dépensé : <strong>'+_devisFmtEUR(e.appro||0)+'</strong><br>'
+                    + '<span style="color:#e78d81;">●</span> Reste dû : <strong>'+_devisFmtEUR(e.approResteDu||0)+'</strong>';
+                const px = (localX/W)*rectBB.width;
+                tooltip.style.left = Math.min(Math.max(px-50,0), Math.max(rectBB.width-160,0)) + 'px';
+                tooltip.style.top = '4px';
+                tooltip.classList.add('show');
+            });
+            rect.addEventListener('pointerleave', () => tooltip.classList.remove('show'));
+        });
+    }
 }
 
 // ── Graphique "Dette clients fidèles" : tendance mensuelle du solde estimé en fin de
