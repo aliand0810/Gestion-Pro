@@ -1461,26 +1461,28 @@
         <div style="padding:16px 18px;">
             <div id="bilan-detail-stats" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;margin-bottom:16px;"></div>
 
-            <!-- Navigation rapide : fait défiler la rangée de colonnes jusqu'à la section visée -->
+            <!-- Navigation rapide : fait défiler la rangée de colonnes jusqu'à la section visée, et réaffiche une colonne masquée -->
             <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:18px;padding-bottom:14px;border-bottom:1.5px solid var(--border-color,#eee);">
-                <a href="javascript:void(0)" onclick="window._bilanDetailScrollToCol('tickets')" style="text-decoration:none;font-size:0.76rem;font-weight:700;color:#2c6fad;background:rgba(44,111,173,0.08);padding:5px 12px;border-radius:20px;">🧾 Tickets de caisse <span id="bilan-detail-count-tickets"></span></a>
-                <a href="javascript:void(0)" onclick="window._bilanDetailScrollToCol('appro')" style="text-decoration:none;font-size:0.76rem;font-weight:700;color:#c0392b;background:rgba(192,57,43,0.08);padding:5px 12px;border-radius:20px;">📦 Approvisionnements <span id="bilan-detail-count-appro"></span></a>
-                <a href="javascript:void(0)" onclick="window._bilanDetailScrollToCol('loyalty')" style="text-decoration:none;font-size:0.76rem;font-weight:700;color:#d97706;background:rgba(217,119,6,0.08);padding:5px 12px;border-radius:20px;">📒 Dette clients fidèles <span id="bilan-detail-count-loyalty"></span></a>
-                <a href="javascript:void(0)" onclick="window._bilanDetailScrollToCol('produits')" style="text-decoration:none;font-size:0.76rem;font-weight:700;color:#5d7a8c;background:rgba(93,122,140,0.08);padding:5px 12px;border-radius:20px;">🏷️ Produits vendus <span id="bilan-detail-count-produits"></span></a>
-                <a href="javascript:void(0)" onclick="window._bilanDetailScrollToCol('factures')" id="bilan-detail-jump-factures" style="display:none;text-decoration:none;font-size:0.76rem;font-weight:700;color:#8e44ad;background:rgba(142,68,173,0.08);padding:5px 12px;border-radius:20px;">💰 Règlements de factures <span id="bilan-detail-count-factures"></span></a>
-                <span style="margin-left:auto;font-size:0.7rem;color:var(--text-muted,#999);align-self:center;white-space:nowrap;">⠿ Glissez l'en-tête d'une colonne pour la réordonner</span>
+                <a href="javascript:void(0)" id="bilan-chip-tickets" data-col="tickets" onclick="window._bilanDetailScrollToCol('tickets')" style="text-decoration:none;font-size:0.76rem;font-weight:700;color:#2c6fad;background:rgba(44,111,173,0.08);padding:5px 12px;border-radius:20px;white-space:nowrap;"><span class="bilan-chip-eye">👁</span> 🧾 Tickets de caisse <span id="bilan-detail-count-tickets"></span></a>
+                <a href="javascript:void(0)" id="bilan-chip-appro" data-col="appro" onclick="window._bilanDetailScrollToCol('appro')" style="text-decoration:none;font-size:0.76rem;font-weight:700;color:#c0392b;background:rgba(192,57,43,0.08);padding:5px 12px;border-radius:20px;white-space:nowrap;"><span class="bilan-chip-eye">👁</span> 📦 Approvisionnements <span id="bilan-detail-count-appro"></span></a>
+                <a href="javascript:void(0)" id="bilan-chip-loyalty" data-col="loyalty" onclick="window._bilanDetailScrollToCol('loyalty')" style="text-decoration:none;font-size:0.76rem;font-weight:700;color:#d97706;background:rgba(217,119,6,0.08);padding:5px 12px;border-radius:20px;white-space:nowrap;"><span class="bilan-chip-eye">👁</span> 📒 Dette clients fidèles <span id="bilan-detail-count-loyalty"></span></a>
+                <a href="javascript:void(0)" id="bilan-chip-produits" data-col="produits" onclick="window._bilanDetailScrollToCol('produits')" style="text-decoration:none;font-size:0.76rem;font-weight:700;color:#5d7a8c;background:rgba(93,122,140,0.08);padding:5px 12px;border-radius:20px;white-space:nowrap;"><span class="bilan-chip-eye">👁</span> 🏷️ Produits vendus <span id="bilan-detail-count-produits"></span></a>
+                <a href="javascript:void(0)" id="bilan-detail-jump-factures" data-col="factures" onclick="window._bilanDetailScrollToCol('factures')" style="display:none;text-decoration:none;font-size:0.76rem;font-weight:700;color:#8e44ad;background:rgba(142,68,173,0.08);padding:5px 12px;border-radius:20px;white-space:nowrap;"><span class="bilan-chip-eye">👁</span> 💰 Règlements de factures <span id="bilan-detail-count-factures"></span></a>
+                <span style="margin-left:auto;font-size:0.7rem;color:var(--text-muted,#999);align-self:center;white-space:nowrap;">⠿ glisser l'en-tête pour réordonner · ✕ pour masquer · bord droit pour redimensionner</span>
             </div>
 
-            <!-- Colonnes côte à côte (tableaux complets), défilement horizontal, réordonnables par glisser-déposer -->
-            <div id="bilan-detail-cols" style="display:flex;gap:16px;align-items:flex-start;overflow-x:auto;padding-bottom:12px;">
+            <!-- Colonnes côte à côte (tableaux complets, même hauteur), défilement horizontal, réordonnables/masquables/redimensionnables -->
+            <div id="bilan-detail-cols" style="display:flex;gap:20px;align-items:stretch;overflow-x:auto;overflow-y:hidden;padding-bottom:14px;">
 
               <!-- Aperçu complet des TICKETS DE CAISSE du mois (un par vente/retour, jamais agrégé) -->
-              <div class="bilan-col" data-col="tickets" style="flex:0 0 420px;min-width:320px;max-width:92vw;">
-                <div class="bilan-col-header" draggable="true" ondragstart="window._bilanColDragStart(event)" ondragover="window._bilanColDragOver(event)" ondrop="window._bilanColDrop(event)" ondragend="window._bilanColDragEnd(event)" style="cursor:grab;user-select:none;display:flex;align-items:baseline;gap:6px;font-weight:800;font-size:0.9rem;margin-bottom:8px;padding:4px 6px;border-radius:6px;">
+              <div class="bilan-col" data-col="tickets" style="position:relative;display:flex;flex-direction:column;flex:0 0 420px;min-width:260px;max-width:92vw;height:60vh;max-height:620px;box-sizing:border-box;border:1.5px solid var(--border-color,#e6e0d6);border-radius:10px;padding:10px;background:var(--bg-card,#fff);">
+                <div class="bilan-col-header" draggable="true" ondragstart="window._bilanColDragStart(event)" ondragover="window._bilanColDragOver(event)" ondrop="window._bilanColDrop(event)" ondragend="window._bilanColDragEnd(event)" style="flex:0 0 auto;cursor:grab;user-select:none;display:flex;align-items:baseline;gap:6px;font-weight:800;font-size:0.9rem;margin-bottom:8px;padding:4px 6px;border-radius:6px;">
                     <span style="opacity:0.4;font-size:0.8rem;">⠿</span>
                     <span>🧾 Tickets de caisse</span>
-                    <span style="font-weight:400;font-size:0.72rem;color:var(--text-muted,#888);">(chaque vente/retour du mois — cliquez un en-tête pour trier)</span>
+                    <span style="font-weight:400;font-size:0.72rem;color:var(--text-muted,#888);">(cliquez un en-tête pour trier)</span>
+                    <button type="button" draggable="false" onclick="window._bilanColHide(event,'tickets')" title="Masquer cette colonne" style="margin-left:auto;flex-shrink:0;border:none;background:rgba(0,0,0,0.06);color:var(--text-main,#555);width:20px;height:20px;border-radius:6px;font-size:0.7rem;cursor:pointer;">✕</button>
                 </div>
+                <div class="bilan-col-body" style="flex:1;min-height:0;overflow-y:auto;">
                 <div class="retours-table-wrap">
                     <table class="retours-table" id="bilan-detail-tickets-table">
                         <thead><tr>
@@ -1495,15 +1497,19 @@
                     </table>
                 </div>
                 <div id="bilan-detail-tickets-empty" style="display:none;text-align:center;padding:18px;color:var(--text-muted,#888);font-size:0.82rem;">Aucun ticket ce mois-ci.</div>
+                </div>
+                <div class="bilan-col-resizer" onmousedown="window._bilanColResizeStart(event,'tickets')" ontouchstart="window._bilanColResizeStart(event,'tickets')" style="position:absolute;top:0;right:-11px;width:16px;height:100%;cursor:col-resize;z-index:3;display:flex;align-items:center;justify-content:center;"><span style="width:4px;height:34px;border-radius:3px;background:var(--border-color,#ccc);"></span></div>
               </div>
 
               <!-- Aperçu complet des APPROVISIONNEMENTS du mois (achats réels, déduits du résultat financier) -->
-              <div class="bilan-col" data-col="appro" style="flex:0 0 420px;min-width:320px;max-width:92vw;">
-                <div class="bilan-col-header" draggable="true" ondragstart="window._bilanColDragStart(event)" ondragover="window._bilanColDragOver(event)" ondrop="window._bilanColDrop(event)" ondragend="window._bilanColDragEnd(event)" style="cursor:grab;user-select:none;display:flex;align-items:baseline;gap:6px;font-weight:800;font-size:0.9rem;margin-bottom:8px;padding:4px 6px;border-radius:6px;">
+              <div class="bilan-col" data-col="appro" style="position:relative;display:flex;flex-direction:column;flex:0 0 420px;min-width:260px;max-width:92vw;height:60vh;max-height:620px;box-sizing:border-box;border:1.5px solid var(--border-color,#e6e0d6);border-radius:10px;padding:10px;background:var(--bg-card,#fff);">
+                <div class="bilan-col-header" draggable="true" ondragstart="window._bilanColDragStart(event)" ondragover="window._bilanColDragOver(event)" ondrop="window._bilanColDrop(event)" ondragend="window._bilanColDragEnd(event)" style="flex:0 0 auto;cursor:grab;user-select:none;display:flex;align-items:baseline;gap:6px;font-weight:800;font-size:0.9rem;margin-bottom:8px;padding:4px 6px;border-radius:6px;">
                     <span style="opacity:0.4;font-size:0.8rem;">⠿</span>
                     <span>📦 Approvisionnements</span>
-                    <span style="font-weight:400;font-size:0.72rem;color:var(--text-muted,#888);">(achats/réassorts réels — déduits du CA)</span>
+                    <span style="font-weight:400;font-size:0.72rem;color:var(--text-muted,#888);">(déduits du CA)</span>
+                    <button type="button" draggable="false" onclick="window._bilanColHide(event,'appro')" title="Masquer cette colonne" style="margin-left:auto;flex-shrink:0;border:none;background:rgba(0,0,0,0.06);color:var(--text-main,#555);width:20px;height:20px;border-radius:6px;font-size:0.7rem;cursor:pointer;">✕</button>
                 </div>
+                <div class="bilan-col-body" style="flex:1;min-height:0;overflow-y:auto;">
                 <div class="retours-table-wrap">
                     <table class="retours-table" id="bilan-detail-appro-table">
                         <thead><tr>
@@ -1518,16 +1524,20 @@
                     </table>
                 </div>
                 <div id="bilan-detail-appro-empty" style="display:none;text-align:center;padding:18px;color:var(--text-muted,#888);font-size:0.82rem;">Aucun approvisionnement ce mois-ci.</div>
+                </div>
+                <div class="bilan-col-resizer" onmousedown="window._bilanColResizeStart(event,'appro')" ontouchstart="window._bilanColResizeStart(event,'appro')" style="position:absolute;top:0;right:-11px;width:16px;height:100%;cursor:col-resize;z-index:3;display:flex;align-items:center;justify-content:center;"><span style="width:4px;height:34px;border-radius:3px;background:var(--border-color,#ccc);"></span></div>
               </div>
 
               <!-- Dette liée aux clients fidèles (compte crédit + échéancier, Fidélité Pro) -->
-              <div class="bilan-col" data-col="loyalty" style="flex:0 0 420px;min-width:320px;max-width:92vw;">
-                <div class="bilan-col-header" draggable="true" ondragstart="window._bilanColDragStart(event)" ondragover="window._bilanColDragOver(event)" ondrop="window._bilanColDrop(event)" ondragend="window._bilanColDragEnd(event)" style="cursor:grab;user-select:none;display:flex;align-items:baseline;gap:6px;font-weight:800;font-size:0.9rem;margin-bottom:8px;padding:4px 6px;border-radius:6px;">
+              <div class="bilan-col" data-col="loyalty" style="position:relative;display:flex;flex-direction:column;flex:0 0 420px;min-width:260px;max-width:92vw;height:60vh;max-height:620px;box-sizing:border-box;border:1.5px solid var(--border-color,#e6e0d6);border-radius:10px;padding:10px;background:var(--bg-card,#fff);">
+                <div class="bilan-col-header" draggable="true" ondragstart="window._bilanColDragStart(event)" ondragover="window._bilanColDragOver(event)" ondrop="window._bilanColDrop(event)" ondragend="window._bilanColDragEnd(event)" style="flex:0 0 auto;cursor:grab;user-select:none;display:flex;align-items:baseline;gap:6px;font-weight:800;font-size:0.9rem;margin-bottom:8px;padding:4px 6px;border-radius:6px;">
                     <span style="opacity:0.4;font-size:0.8rem;">⠿</span>
                     <span>📒 Dette clients fidèles</span>
-                    <span style="font-weight:400;font-size:0.72rem;color:var(--text-muted,#888);">(compte crédit &amp; échelonné, Fidélité Pro)</span>
+                    <span style="font-weight:400;font-size:0.72rem;color:var(--text-muted,#888);">(Fidélité Pro)</span>
+                    <button type="button" draggable="false" onclick="window._bilanColHide(event,'loyalty')" title="Masquer cette colonne" style="margin-left:auto;flex-shrink:0;border:none;background:rgba(0,0,0,0.06);color:var(--text-main,#555);width:20px;height:20px;border-radius:6px;font-size:0.7rem;cursor:pointer;">✕</button>
                 </div>
-                <div id="bilan-detail-loyalty-summary" style="display:flex;gap:16px;flex-wrap:wrap;margin-bottom:10px;font-size:0.8rem;"></div>
+                <div id="bilan-detail-loyalty-summary" style="flex:0 0 auto;display:flex;gap:16px;flex-wrap:wrap;margin-bottom:10px;font-size:0.8rem;"></div>
+                <div class="bilan-col-body" style="flex:1;min-height:0;overflow-y:auto;">
                 <div class="retours-table-wrap">
                     <table class="retours-table" id="bilan-detail-loyalty-table">
                         <thead><tr>
@@ -1540,28 +1550,38 @@
                     </table>
                 </div>
                 <div id="bilan-detail-loyalty-empty" style="display:none;text-align:center;padding:18px;color:var(--text-muted,#888);font-size:0.82rem;">Aucun mouvement de dette client ce mois-ci.</div>
+                </div>
+                <div class="bilan-col-resizer" onmousedown="window._bilanColResizeStart(event,'loyalty')" ontouchstart="window._bilanColResizeStart(event,'loyalty')" style="position:absolute;top:0;right:-11px;width:16px;height:100%;cursor:col-resize;z-index:3;display:flex;align-items:center;justify-content:center;"><span style="width:4px;height:34px;border-radius:3px;background:var(--border-color,#ccc);"></span></div>
               </div>
 
-              <div class="bilan-col" data-col="produits" style="flex:0 0 420px;min-width:320px;max-width:92vw;">
-                <div class="bilan-col-header" draggable="true" ondragstart="window._bilanColDragStart(event)" ondragover="window._bilanColDragOver(event)" ondrop="window._bilanColDrop(event)" ondragend="window._bilanColDragEnd(event)" style="cursor:grab;user-select:none;display:flex;align-items:baseline;gap:6px;font-weight:800;font-size:0.9rem;margin-bottom:8px;padding:4px 6px;border-radius:6px;">
+              <div class="bilan-col" data-col="produits" style="position:relative;display:flex;flex-direction:column;flex:0 0 420px;min-width:260px;max-width:92vw;height:60vh;max-height:620px;box-sizing:border-box;border:1.5px solid var(--border-color,#e6e0d6);border-radius:10px;padding:10px;background:var(--bg-card,#fff);">
+                <div class="bilan-col-header" draggable="true" ondragstart="window._bilanColDragStart(event)" ondragover="window._bilanColDragOver(event)" ondrop="window._bilanColDrop(event)" ondragend="window._bilanColDragEnd(event)" style="flex:0 0 auto;cursor:grab;user-select:none;display:flex;align-items:baseline;gap:6px;font-weight:800;font-size:0.9rem;margin-bottom:8px;padding:4px 6px;border-radius:6px;">
                     <span style="opacity:0.4;font-size:0.8rem;">⠿</span>
                     <span>🏷️ Produits vendus</span>
-                    <span style="font-weight:400;font-size:0.72rem;color:var(--text-muted,#888);">(du plus vendu au moins vendu)</span>
+                    <span style="font-weight:400;font-size:0.72rem;color:var(--text-muted,#888);">(du plus au moins vendu)</span>
+                    <button type="button" draggable="false" onclick="window._bilanColHide(event,'produits')" title="Masquer cette colonne" style="margin-left:auto;flex-shrink:0;border:none;background:rgba(0,0,0,0.06);color:var(--text-main,#555);width:20px;height:20px;border-radius:6px;font-size:0.7rem;cursor:pointer;">✕</button>
                 </div>
+                <div class="bilan-col-body" style="flex:1;min-height:0;overflow-y:auto;">
                 <div class="retours-table-wrap">
                     <table class="retours-table" id="bilan-detail-table">
                         <thead><tr><th>Produit</th><th>Quantité</th><th>Chiffre d'affaires</th></tr></thead>
                         <tbody id="bilan-detail-tbody"></tbody>
                     </table>
                 </div>
+                </div>
+                <div class="bilan-col-resizer" onmousedown="window._bilanColResizeStart(event,'produits')" ontouchstart="window._bilanColResizeStart(event,'produits')" style="position:absolute;top:0;right:-11px;width:16px;height:100%;cursor:col-resize;z-index:3;display:flex;align-items:center;justify-content:center;"><span style="width:4px;height:34px;border-radius:3px;background:var(--border-color,#ccc);"></span></div>
               </div>
 
-              <div class="bilan-col" id="bilan-col-factures" data-col="factures" style="display:none;flex:0 0 420px;min-width:320px;max-width:92vw;">
-                <div class="bilan-col-header" draggable="true" ondragstart="window._bilanColDragStart(event)" ondragover="window._bilanColDragOver(event)" ondrop="window._bilanColDrop(event)" ondragend="window._bilanColDragEnd(event)" style="cursor:grab;user-select:none;display:flex;align-items:baseline;gap:6px;font-weight:800;font-size:0.9rem;margin-bottom:8px;padding:4px 6px;border-radius:6px;">
+              <div class="bilan-col" id="bilan-col-factures" data-col="factures" style="display:none;position:relative;flex-direction:column;flex:0 0 420px;min-width:260px;max-width:92vw;height:60vh;max-height:620px;box-sizing:border-box;border:1.5px solid var(--border-color,#e6e0d6);border-radius:10px;padding:10px;background:var(--bg-card,#fff);">
+                <div class="bilan-col-header" draggable="true" ondragstart="window._bilanColDragStart(event)" ondragover="window._bilanColDragOver(event)" ondrop="window._bilanColDrop(event)" ondragend="window._bilanColDragEnd(event)" style="flex:0 0 auto;cursor:grab;user-select:none;display:flex;align-items:baseline;gap:6px;font-weight:800;font-size:0.9rem;margin-bottom:8px;padding:4px 6px;border-radius:6px;">
                     <span style="opacity:0.4;font-size:0.8rem;">⠿</span>
                     <span>💰 Règlements de factures</span>
+                    <button type="button" draggable="false" onclick="window._bilanColHide(event,'factures')" title="Masquer cette colonne" style="margin-left:auto;flex-shrink:0;border:none;background:rgba(0,0,0,0.06);color:var(--text-main,#555);width:20px;height:20px;border-radius:6px;font-size:0.7rem;cursor:pointer;">✕</button>
                 </div>
+                <div class="bilan-col-body" style="flex:1;min-height:0;overflow-y:auto;">
                 <div id="bilan-detail-direct-list" style="display:flex;flex-direction:column;gap:6px;"></div>
+                </div>
+                <div class="bilan-col-resizer" onmousedown="window._bilanColResizeStart(event,'factures')" ontouchstart="window._bilanColResizeStart(event,'factures')" style="position:absolute;top:0;right:-11px;width:16px;height:100%;cursor:col-resize;z-index:3;display:flex;align-items:center;justify-content:center;"><span style="width:4px;height:34px;border-radius:3px;background:var(--border-color,#ccc);"></span></div>
               </div>
 
             </div>
@@ -9690,7 +9710,7 @@ window._bilanOpenDetail = function(key) {
                     + '<span><strong>'+_devisFmtEUR(s.montant)+'</strong> <span style="color:var(--text-muted,#888);">'+_esc(modeTxt)+'</span></span>'
                     + '</div>';
             }).join('');
-            facturesSec.style.display = '';
+            facturesSec.style.display = 'flex';
             if (facturesJump) facturesJump.style.display = 'inline-block';
         } else {
             facturesSec.style.display = 'none';
@@ -9698,8 +9718,11 @@ window._bilanOpenDetail = function(key) {
         }
     }
 
-    // Réappliquer l'ordre des colonnes mémorisé (glisser-déposer précédent) avant d'afficher
+    // Réappliquer l'ordre, la visibilité (colonnes masquées) et la largeur des colonnes
+    // mémorisés (glisser-déposer / masquage / redimensionnement précédents) avant d'afficher
     if (typeof window._bilanApplyColOrder === 'function') window._bilanApplyColOrder();
+    if (typeof window._bilanApplyColVisibility === 'function') window._bilanApplyColVisibility();
+    if (typeof window._bilanApplyColWidths === 'function') window._bilanApplyColWidths();
 
     const inlineHost = document.getElementById('bilan-detail-inline');
     if (inlineHost) {
@@ -9720,7 +9743,10 @@ window._bilanDetailScrollToCol = function(key) {
     const container = document.getElementById('bilan-detail-cols');
     if (!container) return;
     const col = container.querySelector('.bilan-col[data-col="' + key + '"]');
-    if (col) col.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'start' });
+    if (!col) return;
+    // Une colonne masquée par l'utilisateur est réaffichée d'abord (clic sur sa puce = "montrer")
+    if (col.style.display === 'none') { window._bilanColShow(key); return; }
+    col.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'start' });
 };
 
 window._bilanColDragStart = function(ev) {
@@ -9772,6 +9798,126 @@ window._bilanApplyColOrder = function() {
     const cols = {};
     Array.prototype.forEach.call(container.children, function(c) { if (c.dataset && c.dataset.col) cols[c.dataset.col] = c; });
     saved.forEach(function(key) { if (cols[key]) container.appendChild(cols[key]); });
+};
+
+// ── Masquer / réafficher une colonne (mémorisé) ────────────────────────────────
+var BILAN_COL_HIDDEN_KEY = 'covo_bilan_detail_col_hidden';
+
+function _bilanReadHiddenCols() {
+    let hidden = [];
+    try { hidden = JSON.parse(localStorage.getItem(BILAN_COL_HIDDEN_KEY)) || []; } catch(e) {}
+    return Array.isArray(hidden) ? hidden : [];
+}
+function _bilanWriteHiddenCols(hidden) {
+    try { localStorage.setItem(BILAN_COL_HIDDEN_KEY, JSON.stringify(hidden)); } catch(e) {}
+}
+
+// Met à jour l'apparence des puces de navigation (œil ouvert/barré) selon l'état masqué/visible
+function _bilanRefreshColChipStates(hidden) {
+    ['tickets','appro','loyalty','produits','factures'].forEach(function(key) {
+        const chip = document.getElementById(key === 'factures' ? 'bilan-detail-jump-factures' : 'bilan-chip-' + key);
+        if (!chip) return;
+        const eye = chip.querySelector('.bilan-chip-eye');
+        const isHidden = hidden.indexOf(key) !== -1;
+        if (eye) eye.textContent = isHidden ? '🚫' : '👁';
+        chip.style.opacity = isHidden ? '0.45' : '';
+        chip.title = isHidden ? 'Colonne masquée — cliquer pour la réafficher' : '';
+    });
+}
+
+// Bouton "✕" d'un en-tête de colonne : masque cette colonne et mémorise le choix
+window._bilanColHide = function(ev, key) {
+    if (ev) { ev.preventDefault(); ev.stopPropagation(); }
+    const hidden = _bilanReadHiddenCols();
+    if (hidden.indexOf(key) === -1) hidden.push(key);
+    _bilanWriteHiddenCols(hidden);
+    const col = document.querySelector('#bilan-detail-cols .bilan-col[data-col="' + key + '"]');
+    if (col) col.style.display = 'none';
+    _bilanRefreshColChipStates(hidden);
+};
+
+// Réaffiche une colonne masquée (depuis sa puce de navigation) et mémorise le choix
+window._bilanColShow = function(key) {
+    const hidden = _bilanReadHiddenCols();
+    const idx = hidden.indexOf(key);
+    if (idx !== -1) hidden.splice(idx, 1);
+    _bilanWriteHiddenCols(hidden);
+    const col = document.querySelector('#bilan-detail-cols .bilan-col[data-col="' + key + '"]');
+    if (col) {
+        col.style.display = 'flex';
+        col.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'start' });
+    }
+    _bilanRefreshColChipStates(hidden);
+};
+
+// Réapplique les colonnes masquées mémorisées (appelé à chaque ouverture du détail) — ne fait
+// qu'AJOUTER du masquage, ne réaffiche jamais une colonne (ex. Factures) déjà masquée faute de
+// données ce mois-ci : cette dernière n'a de toute façon pas de puce cliquable quand elle est vide.
+window._bilanApplyColVisibility = function() {
+    const container = document.getElementById('bilan-detail-cols');
+    if (!container) return;
+    const hidden = _bilanReadHiddenCols();
+    Array.prototype.forEach.call(container.children, function(c) {
+        if (c.dataset && c.dataset.col && hidden.indexOf(c.dataset.col) !== -1) c.style.display = 'none';
+    });
+    _bilanRefreshColChipStates(hidden);
+};
+
+// ── Redimensionnement d'une colonne par glisser sur son bord droit (mémorisé) ─────────────
+var BILAN_COL_WIDTHS_KEY = 'covo_bilan_detail_col_widths';
+var _bilanColResizing = null;
+const BILAN_COL_MIN_W = 260, BILAN_COL_MAX_W = 900;
+
+function _bilanResizeClientX(ev) {
+    if (ev.touches && ev.touches.length) return ev.touches[0].clientX;
+    if (ev.changedTouches && ev.changedTouches.length) return ev.changedTouches[0].clientX;
+    return ev.clientX;
+}
+
+window._bilanColResizeStart = function(ev, key) {
+    ev.preventDefault();
+    const col = document.querySelector('#bilan-detail-cols .bilan-col[data-col="' + key + '"]');
+    if (!col) return;
+    _bilanColResizing = { col: col, key: key, startX: _bilanResizeClientX(ev), startWidth: col.getBoundingClientRect().width };
+    document.addEventListener('mousemove', window._bilanColResizeMove);
+    document.addEventListener('mouseup', window._bilanColResizeEnd);
+    document.addEventListener('touchmove', window._bilanColResizeMove, { passive: false });
+    document.addEventListener('touchend', window._bilanColResizeEnd);
+    document.body.style.userSelect = 'none';
+};
+
+window._bilanColResizeMove = function(ev) {
+    if (!_bilanColResizing) return;
+    if (ev.cancelable) ev.preventDefault();
+    const dx = _bilanResizeClientX(ev) - _bilanColResizing.startX;
+    const w = Math.max(BILAN_COL_MIN_W, Math.min(BILAN_COL_MAX_W, Math.round(_bilanColResizing.startWidth + dx)));
+    _bilanColResizing.col.style.flex = '0 0 ' + w + 'px';
+};
+
+window._bilanColResizeEnd = function() {
+    if (!_bilanColResizing) return;
+    const key = _bilanColResizing.key;
+    const w = Math.round(_bilanColResizing.col.getBoundingClientRect().width);
+    let widths = {};
+    try { widths = JSON.parse(localStorage.getItem(BILAN_COL_WIDTHS_KEY)) || {}; } catch(e) {}
+    widths[key] = w;
+    try { localStorage.setItem(BILAN_COL_WIDTHS_KEY, JSON.stringify(widths)); } catch(e) {}
+    document.removeEventListener('mousemove', window._bilanColResizeMove);
+    document.removeEventListener('mouseup', window._bilanColResizeEnd);
+    document.removeEventListener('touchmove', window._bilanColResizeMove);
+    document.removeEventListener('touchend', window._bilanColResizeEnd);
+    document.body.style.userSelect = '';
+    _bilanColResizing = null;
+};
+
+// Réapplique les largeurs de colonnes mémorisées (appelé à chaque ouverture du détail)
+window._bilanApplyColWidths = function() {
+    let widths = {};
+    try { widths = JSON.parse(localStorage.getItem(BILAN_COL_WIDTHS_KEY)) || {}; } catch(e) {}
+    Object.keys(widths).forEach(function(key) {
+        const col = document.querySelector('#bilan-detail-cols .bilan-col[data-col="' + key + '"]');
+        if (col && widths[key]) col.style.flex = '0 0 ' + widths[key] + 'px';
+    });
 };
 
 // Panneau détail mensuel : en ligne dans la page (plus une fenêtre popup) — on masque simplement le panneau
