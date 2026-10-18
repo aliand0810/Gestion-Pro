@@ -501,8 +501,19 @@
     .devis-icon-btn { background:none; border:none; cursor:pointer; font-size:1.02rem; padding:4px 6px; border-radius:6px; transition:background 0.15s; }
     .devis-icon-btn:hover { background:var(--bg-card-3,#f0f3f7); }
 </style>
+<style>
+/* ===== Bande d'en-tête (même modèle que Caisse Pro, couleur propre à chaque app) ===== */
+.cp-band { background:linear-gradient(135deg,var(--band-a) 0%,var(--band-b) 100%); padding:18px 20px 16px; position:relative; overflow:hidden; border-radius:0 0 16px 16px; }
+.cp-band::before { content:''; position:absolute; top:-28px; right:-18px; width:100px; height:100px; border-radius:50%; background:rgba(255,255,255,0.06); pointer-events:none; }
+.cp-band::after { content:''; position:absolute; bottom:-14px; right:70px; width:65px; height:65px; border-radius:50%; background:rgba(255,255,255,0.04); pointer-events:none; }
+.cp-band-row { position:relative; display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:12px; }
+.cp-band-title { font-size:1.25rem; font-weight:900; color:#fff; letter-spacing:-0.3px; }
+.cp-band-sub { font-size:0.72rem; color:rgba(255,255,255,0.75); margin-top:3px; }
+@media (max-width:600px) { .cp-band-title { font-size:1.1rem; } }
+</style>
 </head>
 <body>
+<script src="https://aliand0810.github.io/licences/licence_check.js" data-produit="COVO Pro" data-module="Gestion"></script>
 <script>
 /* ═══════════════════════════════════════════════════════════════════════════
    GESTION PRO — CATALOGUE : CATÉGORIES + CORRECTIF D'ÉDITION
@@ -770,7 +781,6 @@
 </div>
 
 <div id="cp-topbar">
-    <a class="cp-back" href="https://aliand0810.github.io/Covo-pro/" target="covopro">&larr; COVO Pro</a>
     <div class="cp-title">&#9881;&#65039; Gestion Pro<small>Produits &middot; Inventaire &middot; Utilisateurs &middot; Configuration &mdash; donn&eacute;es partag&eacute;es avec COVO Pro</small></div>
     <span id="cp-user-badge">&#128100; &mdash;</span>
     <span id="cp-master-save-bar" onclick="cpMasterManualSave()" title="Sauvegarder toutes les modifications sur Google Drive (Admin-Développeur)" style="display:none;align-items:center;gap:5px;background:linear-gradient(135deg,#e74c3c,#c0392b);color:#fff;border-radius:8px;padding:5px 12px;cursor:pointer;font-weight:800;font-size:0.78rem;white-space:nowrap;user-select:none;">💾 <span id="cp-master-save-count">0</span></span>
@@ -799,6 +809,15 @@
             <button class="secondary" onclick="cpDriveBackupNow()">&#128190; Sauvegarder maintenant</button>
             <button class="secondary" onclick="cpDriveRestoreLatest()">&#128229; Restaurer la derni&egrave;re sauvegarde</button>
             <span id="cp-drive-status" style="font-size:0.74rem;color:var(--text-muted);">Non connect&eacute;</span>
+        </div>
+    </div>
+</div>
+
+<div class="cp-band" style="--band-a:#374151;--band-b:#111827;margin-bottom:0;">
+    <div class="cp-band-row">
+        <div>
+            <div class="cp-band-title">⚙️ Gestion</div>
+            <div class="cp-band-sub">Catalogue · Inventaire · Stock · Échéances · Utilisateurs · Devis · Bilan</div>
         </div>
     </div>
 </div>
@@ -10872,6 +10891,63 @@ function _bilanInit() {
     // Connexion Google Drive automatique par défaut, dès l'ouverture — plus besoin de cliquer
     // "Connecter" ici : réutilise le Client ID déjà configuré via COVO Pro (silencieuse).
     if (savedClientId) { setTimeout(function(){ cpDriveConnect({ silent: true }); }, 1200); }
+})();
+</script>
+<script>
+/* ═══════════════════════════════════════════════════════════════════════════
+   BARRE DU HAUT AUTO-MASQUÉE (toutes les apps satellites)
+   • Masquée par défaut : la page gagne toute la hauteur de l'écran
+   • Souris en haut de l'écran (ou sur la barre) → elle descend ; la souris s'en va → elle remonte
+   • Écran tactile : petite languette « ▾ » en haut au centre pour l'ouvrir / la refermer
+   • Reste ouverte tant qu'un champ ou un bouton de la barre a le focus (clavier)
+   ═══════════════════════════════════════════════════════════════════════════ */
+(function () {
+    'use strict';
+    if (window._cpTopAutoHide) return;
+    window._cpTopAutoHide = true;
+    function init() {
+        var bar = document.getElementById('cp-topbar'); if (!bar) return;
+        var css = document.createElement('style');
+        css.textContent = [
+            '#cp-topbar{position:fixed!important;top:0;left:0;right:0;z-index:9600!important;transform:translateY(-100%);transition:transform .22s ease,box-shadow .22s ease;will-change:transform;}',
+            '#cp-topbar.cp-tb-show{transform:none;box-shadow:0 10px 28px rgba(0,0,0,.18);}',
+            '#cp-tb-zone{position:fixed;top:0;left:0;right:0;height:10px;z-index:9599;}',
+            '#cp-tb-tab{position:fixed;top:0;left:50%;transform:translateX(-50%);z-index:9598;border:1px solid var(--border-color,#ccc);border-top:none;border-radius:0 0 12px 12px;background:var(--bg-card,#fff);color:var(--text-muted,#666);font-size:.7rem;font-weight:800;line-height:1;padding:3px 14px 5px;cursor:pointer;opacity:.75;box-shadow:0 3px 10px rgba(0,0,0,.12);transition:opacity .2s,transform .22s;font-family:inherit;}',
+            '#cp-tb-tab:hover{opacity:1;}',
+            'body.cp-tb-open #cp-tb-tab{opacity:0;pointer-events:none;}',
+            '#gst-subtabs{top:0!important;}',
+            '@media print{#cp-tb-zone,#cp-tb-tab{display:none!important;}}',
+            '@media (prefers-reduced-motion: reduce){#cp-topbar{transition:none;}}'
+        ].join('\n');
+        document.head.appendChild(css);
+        var zone = document.createElement('div'); zone.id = 'cp-tb-zone'; zone.setAttribute('aria-hidden', 'true');
+        var tab = document.createElement('button'); tab.id = 'cp-tb-tab'; tab.type = 'button'; tab.textContent = '▾'; tab.title = 'Afficher la barre du haut'; tab.setAttribute('aria-label', 'Afficher la barre du haut');
+        document.body.appendChild(zone); document.body.appendChild(tab);
+        var t = null, pinned = false;
+        function show() { clearTimeout(t); bar.classList.add('cp-tb-show'); document.body.classList.add('cp-tb-open'); }
+        function hide(delay) {
+            clearTimeout(t);
+            t = setTimeout(function () {
+                if (pinned || bar.matches(':hover') || bar.contains(document.activeElement)) return;
+                bar.classList.remove('cp-tb-show'); document.body.classList.remove('cp-tb-open');
+            }, delay == null ? 450 : delay);
+        }
+        zone.addEventListener('mouseenter', show);
+        bar.addEventListener('mouseenter', show);
+        bar.addEventListener('mouseleave', function () { hide(); });
+        bar.addEventListener('focusin', show);
+        bar.addEventListener('focusout', function () { hide(200); });
+        document.addEventListener('mousemove', function (e) { if (e.clientY <= 6) show(); }, { passive: true });
+        // Tactile : la languette ouvre la barre, un appui ailleurs la referme
+        tab.addEventListener('click', function () { pinned = true; show(); });
+        document.addEventListener('pointerdown', function (e) {
+            if (!pinned) return;
+            if (bar.contains(e.target) || e.target === tab) return;
+            pinned = false; hide(0);
+        }, true);
+        window._cpTopbarShow = show; window._cpTopbarHide = function () { pinned = false; hide(0); };
+    }
+    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init); else init();
 })();
 </script>
 </body>
