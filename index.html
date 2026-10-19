@@ -9668,7 +9668,7 @@ window._devisGeneratePDF = function(id) {
         + '.footer{font-size:9.5px;color:#999;text-align:center;border-top:1px solid #e8eaed;padding-top:10px;}'
         + '@media print{ .toolbar{display:none;} @page{size:A4;margin:16mm;} }'
         + '</style></head><body>'
-        + '<div class="toolbar"><button onclick="window.print()">🖨️ Imprimer / Enregistrer en PDF</button></div>'
+        + '<div class="toolbar">' + ((window._devisBLReady && window._devisBLReady(d)) ? ('<button onclick="try{window.opener._devisGenerateBL(\'' + String(d.id).replace(/'/g, '') + '\')}catch(e){alert(\'Ouvrez le bon de livraison depuis Gestion Pro\')}" style="background:linear-gradient(135deg,#1b7a43,#145c33)">🚚 Bon de livraison</button>') : '') + '<button onclick="window.print()">🖨️ Imprimer / Enregistrer en PDF</button></div>'
         + '<div class="head"><div>'
         +   (logoUrl ? ('<img src="' + logoUrl.replace(/"/g,'') + '" alt="logo"><br>') : '')
         +   '<div class="shop">' + shopName.replace(/</g,'&lt;') + '</div>'
@@ -9694,6 +9694,7 @@ window._devisGeneratePDF = function(id) {
         +   '<tr class="ttc"><td>TOTAL ' + (d.tvaPct ? 'TTC' : '') + '</td><td class="r">' + _devisFmtEUR(d.totalTTC) + '</td></tr>'
         + '</table></div>'
         + (d.notes ? ('<div class="notes">' + d.notes.replace(/</g,'&lt;').replace(/\n/g,'<br>') + '</div>') : '')
+        + (window._devisPayBlockHTML ? window._devisPayBlockHTML(d) : '')
         + _devisStampHTML(d)
         + (window._devisRibHTML ? window._devisRibHTML(d) : '')
         + '<div class="footer">' + docLabel + ' généré' + (docLabel==='Facture'?'e':'') + ' le ' + new Date().toLocaleDateString('fr-FR',{day:'2-digit',month:'long',year:'numeric'}) + ' — ' + shopName.replace(/</g,'&lt;') + '</div>'
@@ -11033,12 +11034,14 @@ function _bilanInit() {
             + '.chk{display:inline-block;width:13px;height:13px;border:1.5px solid #1b7a43;border-radius:3px;}'
             + '.sum{display:flex;justify-content:space-between;background:#f1f8f4;border:1px solid #cfe8d8;border-radius:8px;padding:9px 12px;font-size:11.5px;margin-bottom:16px;}'
             + '.obs{border:1px dashed #b8c4cf;border-radius:8px;min-height:58px;padding:9px 12px;margin-bottom:18px;font-size:11px;color:#6b7785;}'
+            + '.datebox{display:flex;align-items:flex-end;gap:6px;margin:4px 0 12px;font-size:11px;font-weight:700;color:#1e2d3d;}.datebox i{display:inline-block;width:34px;height:26px;border:1.5px solid #1b7a43;border-radius:5px;}.datebox i.y{width:58px;}.datebox b{font-size:16px;color:#1b7a43;padding-bottom:3px;}'
+            + '.fld{font-size:11px;color:#555;border-bottom:1px dotted #b8c4cf;padding:10px 0 3px;margin-bottom:6px;}.mention{font-size:9.5px;color:#888;font-style:italic;margin-top:6px;}.sign .rec{border:1.5px solid #1b7a43;}'
             + '.sign{display:flex;gap:16px;margin-bottom:20px;}.sign .box{min-height:110px;background:#fff;}.sign .line{margin-top:58px;border-top:1px solid #b8c4cf;padding-top:4px;font-size:9.5px;color:#888;}'
             + '.footer{font-size:9.5px;color:#999;text-align:center;border-top:1px solid #e8eaed;padding-top:10px;}'
             + '@media print{.toolbar{display:none;}@page{size:A4;margin:16mm;}body{padding:0;}}'
             + '@media (max-width:600px){body{padding:14px;}.head,.boxes,.sign{flex-direction:column;}h1,.meta{text-align:left;}}'
             + '</style></head><body>'
-            + '<div class="toolbar"><button onclick="window.print()">🖨️ Imprimer / Enregistrer en PDF</button></div>'
+            + '<div class="toolbar"><button onclick="try{window.opener._devisGeneratePDF(\'' + String(d.id).replace(/'/g, '') + '\')}catch(e){alert(\'Ouvrez la facture depuis Gestion Pro\')}" style="background:linear-gradient(135deg,#2c6fad,#1b456b)">🧾 Facture complète</button><button onclick="window.print()">🖨️ Imprimer / Enregistrer en PDF</button></div>'
             + '<div class="head"><div>' + (logo ? '<img src="' + String(logo).replace(/"/g, '') + '" alt="logo"><br>' : '')
             + '<div class="shop">' + esc(shop) + '</div><div class="shopinfo">' + [rc.address, rc.siret ? 'SIRET ' + rc.siret : '', rc.phone ? '📞 ' + rc.phone : '', rc.email ? '✉️ ' + rc.email : ''].filter(Boolean).map(esc).join('<br>') + '</div></div>'
             + '<div><h1>BON DE LIVRAISON</h1><div class="meta">N° <b>' + esc(d.blNumero) + '</b><br>Date : ' + blD.toLocaleDateString('fr-FR', { day: '2-digit', month: 'long', year: 'numeric' })
@@ -11049,10 +11052,14 @@ function _bilanInit() {
             + '<div class="box"><div class="lbl">Adresse de livraison</div><div class="val">' + (cli.adresse ? esc(cli.adresse).replace(/\n/g, '<br>') : '<span style="color:#aaa;">—</span>') + '</div></div></div>'
             + '<table><thead><tr><th class="c" style="width:38px;">#</th><th>Désignation</th><th class="c" style="width:110px;">Qté commandée</th><th class="c" style="width:95px;">Qté livrée</th><th class="c" style="width:70px;">Contrôle</th></tr></thead><tbody>'
             + (rows || '<tr><td colspan="5" style="text-align:center;color:#999;">Aucun article</td></tr>') + '</tbody></table>'
-            + '<div class="sum"><span><b>' + items.length + '</b> ligne' + (items.length > 1 ? 's' : '') + ' · <b>' + (Math.round(totalQ * 1000) / 1000) + '</b> article' + (totalQ > 1 ? 's' : '') + ' au total</span><span>Règlement : <b>' + _devisFmtEUR(_devisMontantRegle(d)) + '</b>' + (modes ? ' (' + esc(modes) + ')' : '') + '</span></div>'
+            + '<div class="sum"><span><b>' + items.length + '</b> ligne' + (items.length > 1 ? 's' : '') + ' · <b>' + (Math.round(totalQ * 1000) / 1000) + '</b> article' + (totalQ > 1 ? 's' : '') + ' au total</span><span>✅ Facture ' + esc(d.numero) + ' réglée' + (modes ? ' (' + esc(modes) + ')' : '') + '</span></div>'
             + '<div class="lbl">Observations / réserves à la livraison</div><div class="obs">' + (d.notes ? esc(d.notes).replace(/\n/g, '<br>') : '') + '</div>'
-            + '<div class="sign"><div class="box"><div class="lbl">Livré par</div><div class="line">Nom, date et signature</div></div>'
-            + '<div class="box"><div class="lbl">Reçu par le client</div><div class="line">Nom, date et signature — « Marchandise reçue conforme »</div></div></div>'
+            + '<div class="sign"><div class="box"><div class="lbl">Livré par</div><div class="fld">Nom :</div><div class="line">Signature</div></div>'
+            + '<div class="box rec"><div class="lbl">Bon pour réception — le client</div>'
+            +   '<div class="datebox"><span>Date de réception :</span><i></i><b>/</b><i></i><b>/</b><i class="y"></i></div>'
+            +   '<div class="fld">Nom :</div>'
+            +   '<div class="mention">Mention manuscrite « Bon pour réception »</div>'
+            +   '<div class="line">Signature</div></div></div>'
             + '<div class="footer">Bon de livraison ' + esc(d.blNumero) + ' — facture ' + esc(d.numero) + ' — ' + esc(shop) + '</div>'
             + '</body></html>';
         w.document.open(); w.document.write(html); w.document.close();
@@ -11239,6 +11246,38 @@ function _bilanInit() {
         var r = op.apply(this, arguments);
         var body = $('devis-preview-body'), h = window._devisRibHTML();
         if (body && h) { var d = document.createElement('div'); d.id = 'devis-preview-rib'; d.innerHTML = h; d.firstChild.style.borderRadius = '10px'; body.appendChild(d); }
+        return r;
+    };
+})();
+</script>
+<script>
+/* ═══ Facture complète + bon de livraison côte à côte ═══ */
+(function () {
+    'use strict';
+    if (window._devisTwoDocs) return; window._devisTwoDocs = true;
+    function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
+    // Règlements détaillés + reste à payer (facture complète)
+    window._devisPayBlockHTML = function (d) {
+        if (!d || d.statut !== 'accepte') return '';
+        var ps = Array.isArray(d.paiements) ? d.paiements : [];
+        var regle = _devisMontantRegle(d), reste = _devisResteAPayer(d);
+        var rows = ps.slice().sort(function (a, b) { return String(a.date || '').localeCompare(String(b.date || '')); }).map(function (p) {
+            var mode = typeof _devisPaymentModeLabel === 'function' ? _devisPaymentModeLabel(p.mode) : (p.mode || '');
+            return '<tr><td style="border:none;padding:3px 0;">' + _devisFmtDateFR(String(p.date || '').slice(0, 10)) + '</td><td style="border:none;padding:3px 0;">' + esc(mode) + '</td><td style="border:none;padding:3px 0;text-align:right;font-weight:700;">' + _devisFmtEUR(p.montant) + '</td></tr>';
+        }).join('');
+        var ok = reste <= 0.004 && regle > 0.004;
+        return '<div style="border:1px solid ' + (ok ? '#a5d6a7' : '#f3e0a3') + ';background:' + (ok ? '#f1f8f4' : '#fffbeb') + ';border-radius:8px;padding:10px 14px;margin:0 0 16px;page-break-inside:avoid;">'
+            + '<div style="font-size:9px;text-transform:uppercase;letter-spacing:.5px;color:' + (ok ? '#1b7a43' : '#8a6d00') + ';font-weight:800;margin-bottom:6px;">' + (ok ? '✅ Facture acquittée' : '💳 Règlements') + '</div>'
+            + (rows ? '<table style="width:100%;border-collapse:collapse;font-size:11px;margin:0 0 6px;">' + rows + '</table>' : '<div style="font-size:11px;color:#777;margin-bottom:6px;">Aucun règlement enregistré.</div>')
+            + '<div style="display:flex;justify-content:space-between;font-size:11.5px;border-top:1px solid rgba(0,0,0,.08);padding-top:6px;"><span>Total réglé : <b>' + _devisFmtEUR(regle) + '</b></span><span>Reste à payer : <b style="color:' + (ok ? '#1b7a43' : '#c0392b') + ';">' + _devisFmtEUR(reste) + '</b></span></div></div>';
+    };
+    var op = window._devisOpenPreview;
+    if (typeof op === 'function') window._devisOpenPreview = function (id) {
+        var r = op.apply(this, arguments);
+        var d = _devisGetAll().find(function (x) { return x.id === id; });
+        var pdf = document.getElementById('devis-preview-btn-pdf'), bl = document.getElementById('devis-preview-btn-bl');
+        if (pdf && d) pdf.textContent = d.statut === 'accepte' ? '🧾 Facture complète' : '🖨️ PDF';
+        if (pdf && bl && pdf.nextElementSibling !== bl) pdf.parentNode.insertBefore(bl, pdf.nextSibling);
         return r;
     };
 })();
