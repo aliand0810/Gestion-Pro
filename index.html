@@ -10975,9 +10975,14 @@ function _bilanInit() {
     function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
 
     // Facture validée + règlement complet
+    // Bon de livraison : disponible pour TOUTE facture (devis accepté), réglée ou non
     window._devisBLReady = function (d) {
+        return !!(d && d.statut === 'accepte' && Array.isArray(d.items) && d.items.length);
+    };
+    window._devisIsPaid = function (d) {
         return !!(d && d.statut === 'accepte' && (parseFloat(d.totalTTC) || 0) > 0 && _devisMontantRegle(d) > 0.004 && _devisResteAPayer(d) <= 0.004);
     };
+    function payState(d) { return window._devisIsPaid(d) ? 'paid' : (_devisMontantRegle(d) > 0.004 ? 'part' : 'none'); }
     function nextBL() {
         var y = new Date().getFullYear(), max = 0;
         _devisGetAll().forEach(function (x) { var m = /^BL-(\d{4})-(\d{4})$/.exec(x.blNumero || ''); if (m && +m[1] === y) max = Math.max(max, +m[2]); });
@@ -11046,13 +11051,13 @@ function _bilanInit() {
             + '<div class="shop">' + esc(shop) + '</div><div class="shopinfo">' + [rc.address, rc.siret ? 'SIRET ' + rc.siret : '', rc.phone ? '📞 ' + rc.phone : '', rc.email ? '✉️ ' + rc.email : ''].filter(Boolean).map(esc).join('<br>') + '</div></div>'
             + '<div><h1>BON DE LIVRAISON</h1><div class="meta">N° <b>' + esc(d.blNumero) + '</b><br>Date : ' + blD.toLocaleDateString('fr-FR', { day: '2-digit', month: 'long', year: 'numeric' })
             + '<br>Réf. facture : <b>' + esc(d.numero) + '</b> du ' + _devisFmtDateFR(d.dateEmission)
-            + '<br><span class="paid">✅ Facture réglée' + (payD ? ' le ' + _devisFmtDateFR(payD.slice(0, 10)) : '') + '</span></div></div></div>'
+            + '<br>' + (payState(d) === 'paid' ? '<span class="paid">✅ Facture réglée' + (payD ? ' le ' + _devisFmtDateFR(payD.slice(0, 10)) : '') + '</span>' : (payState(d) === 'part' ? '<span class="paid" style="background:#fff8e1;color:#8a6d00;border-color:#f3e0a3;">🟡 Facture partiellement réglée</span>' : '<span class="paid" style="background:#fdecea;color:#a52714;border-color:#f5c6c0;">⏳ Facture en attente de règlement</span>')) + '</div></div></div>'
             + '<div class="boxes"><div class="box"><div class="lbl">Client</div><div class="val"><strong>' + esc(cli.nom || '—') + '</strong>'
             + (cli.tel ? '<br>📞 ' + esc(cli.tel) : '') + (cli.email ? '<br>✉️ ' + esc(cli.email) : '') + '</div></div>'
             + '<div class="box"><div class="lbl">Adresse de livraison</div><div class="val">' + (cli.adresse ? esc(cli.adresse).replace(/\n/g, '<br>') : '<span style="color:#aaa;">—</span>') + '</div></div></div>'
             + '<table><thead><tr><th class="c" style="width:38px;">#</th><th>Désignation</th><th class="c" style="width:110px;">Qté commandée</th><th class="c" style="width:95px;">Qté livrée</th><th class="c" style="width:70px;">Contrôle</th></tr></thead><tbody>'
             + (rows || '<tr><td colspan="5" style="text-align:center;color:#999;">Aucun article</td></tr>') + '</tbody></table>'
-            + '<div class="sum"><span><b>' + items.length + '</b> ligne' + (items.length > 1 ? 's' : '') + ' · <b>' + (Math.round(totalQ * 1000) / 1000) + '</b> article' + (totalQ > 1 ? 's' : '') + ' au total</span><span>✅ Facture ' + esc(d.numero) + ' réglée' + (modes ? ' (' + esc(modes) + ')' : '') + '</span></div>'
+            + '<div class="sum"><span><b>' + items.length + '</b> ligne' + (items.length > 1 ? 's' : '') + ' · <b>' + (Math.round(totalQ * 1000) / 1000) + '</b> article' + (totalQ > 1 ? 's' : '') + ' au total</span><span>' + (payState(d) === 'paid' ? '✅ Facture ' + esc(d.numero) + ' réglée' + (modes ? ' (' + esc(modes) + ')' : '') : (payState(d) === 'part' ? '🟡 Facture ' + esc(d.numero) + ' partiellement réglée' : '⏳ Facture ' + esc(d.numero) + ' — règlement en attente')) + '</span></div>'
             + '<div class="lbl">Observations / réserves à la livraison</div><div class="obs">' + (d.notes ? esc(d.notes).replace(/\n/g, '<br>') : '') + '</div>'
             + '<div class="sign"><div class="box"><div class="lbl">Livré par</div><div class="fld">Nom :</div><div class="line">Signature</div></div>'
             + '<div class="box rec"><div class="lbl">Bon pour réception — le client</div>'
@@ -11080,7 +11085,7 @@ function _bilanInit() {
             box.style.cssText = 'display:flex;align-items:center;gap:12px;border-radius:12px;padding:12px 14px;margin:0 0 14px;' + (ready ? 'background:rgba(39,174,96,.09);border:1.5px solid rgba(39,174,96,.45);' : 'background:var(--bg-body,#f4f7f6);border:1.5px dashed var(--border-color,#ddd);');
             box.innerHTML = '<div style="font-size:1.6rem;">🚚</div><div style="flex:1;min-width:0;">'
                 + (ready
-                    ? '<div style="font-weight:900;color:#1b7a43;font-size:.9rem;">Bon de livraison ' + (d.blNumero ? esc(d.blNumero) : 'prêt') + '</div><div style="font-size:.74rem;color:var(--text-muted,#888);margin-top:2px;">Facture validée et entièrement réglée' + (d.blDate ? ' · généré le ' + _devisFmtDateFR(d.blDate.slice(0, 10)) : '') + '</div>'
+                    ? '<div style="font-weight:900;color:#1b7a43;font-size:.9rem;">Bon de livraison ' + (d.blNumero ? esc(d.blNumero) : 'prêt') + '</div><div style="font-size:.74rem;color:var(--text-muted,#888);margin-top:2px;">' + (window._devisIsPaid(d) ? 'Facture validée et entièrement réglée' : (_devisMontantRegle(d) > 0.004 ? 'Facture validée · partiellement réglée' : 'Facture validée · règlement en attente')) + (d.blDate ? ' · généré le ' + _devisFmtDateFR(d.blDate.slice(0, 10)) : '') + '</div>'
                     : '<div style="font-weight:800;color:var(--text-main);font-size:.86rem;">Bon de livraison</div><div style="font-size:.74rem;color:var(--text-muted,#888);margin-top:2px;">Disponible dès que la facture est entièrement réglée (reste ' + _devisFmtEUR(_devisResteAPayer(d)) + ').</div>')
                 + '</div>' + (ready ? '<button type="button" onclick="window._devisGenerateBL(\'' + String(d.id).replace(/'/g, '') + '\')" style="padding:9px 14px;border:none;border-radius:9px;background:linear-gradient(135deg,#27ae60,#1b7a43);color:#fff;font-weight:800;font-size:.8rem;cursor:pointer;white-space:nowrap;">🖨️ Afficher</button>' : '');
             body.insertBefore(box, body.firstChild);
@@ -11093,10 +11098,10 @@ function _bilanInit() {
     if (typeof cp === 'function') window._devisConfirmPayment = function () {
         var id = (typeof _devisPaymentDevisId !== 'undefined') ? _devisPaymentDevisId : null;
         var before = id ? _devisGetAll().find(function (x) { return x.id === id; }) : null;
-        var wasReady = window._devisBLReady(before);
+        var wasPaid = window._devisIsPaid(before);
         var r = cp.apply(this, arguments);
         var after = id ? _devisGetAll().find(function (x) { return x.id === id; }) : null;
-        if (!wasReady && window._devisBLReady(after)) {
+        if (!wasPaid && window._devisIsPaid(after)) {
             window._devisGenerateBL(id);
             var d2 = _devisGetAll().find(function (x) { return x.id === id; });
             showScanToast('✅ Facture soldée — bon de livraison ' + ((d2 && d2.blNumero) || '') + ' généré', 'success');
