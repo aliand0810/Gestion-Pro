@@ -1959,6 +1959,8 @@
             <div id="devis-empty-sub" style="font-size:0.82rem;margin-top:4px;">Cliquez sur « ➕ Nouveau devis » pour en créer un.</div>
         </div>
     </div>
+    <!-- Coordonnées bancaires (RIB) pour les virements -->
+    <div id="devis-rib-host"></div>
 </div>
 </div>
 
@@ -2310,6 +2312,7 @@
       <button id="devis-preview-btn-del" onclick="" style="padding:9px 14px;background:none;color:#e74c3c;border:1.5px solid #e74c3c;border-radius:9px;cursor:pointer;font-size:0.82rem;font-weight:700;">🗑️ Supprimer</button>
       <button id="devis-preview-btn-dup" onclick="" style="padding:9px 14px;background:var(--bg-card,#fff);color:var(--text-main);border:1.5px solid var(--border-color,#ddd);border-radius:9px;cursor:pointer;font-size:0.82rem;font-weight:700;">📋 Dupliquer</button>
       <button id="devis-preview-btn-pdf" onclick="" style="padding:9px 16px;background:linear-gradient(135deg,#2c6fad,#1b456b);color:white;border:none;border-radius:9px;cursor:pointer;font-size:0.83rem;font-weight:800;">🖨️ PDF</button>
+      <button id="devis-preview-btn-bl" onclick="" style="display:none;padding:9px 16px;background:linear-gradient(135deg,#1b7a43,#145c33);color:white;border:none;border-radius:9px;cursor:pointer;font-size:0.83rem;font-weight:800;" title="Bon de livraison (facture réglée)">🚚 Bon de livraison</button>
       <button id="devis-preview-btn-pay" onclick="" style="padding:9px 16px;background:linear-gradient(135deg,#27ae60,#1e8449);color:white;border:none;border-radius:9px;cursor:pointer;font-size:0.83rem;font-weight:800;">💰 Régler</button>
       <button id="devis-preview-btn-edit" onclick="" style="padding:9px 18px;background:#e38737;color:white;border:none;border-radius:9px;cursor:pointer;font-size:0.83rem;font-weight:800;margin-left:auto;">✏️ Modifier</button>
     </div>
@@ -8887,6 +8890,7 @@ function _devisRenderList() {
             +   '</div>'
             +   '<div onclick="event.stopPropagation()" style="display:flex;gap:2px;border-left:1.5px solid var(--border-color,#eee);padding-left:10px;flex-shrink:0;">'
             +     '<button class="devis-icon-btn" onclick="_devisGeneratePDF(\'' + d.id + '\')" title="PDF / Imprimer">🖨️</button>'
+            +     ((window._devisBLReady && window._devisBLReady(d)) ? ('<button class="devis-icon-btn" onclick="_devisGenerateBL(\'' + d.id + '\')" title="Bon de livraison' + (d.blNumero ? ' ' + d.blNumero : '') + '">🚚</button>') : '')
             +     '<button class="devis-icon-btn" onclick="_devisDuplicate(\'' + d.id + '\')" title="Dupliquer">📋</button>'
             +     (_devisCanDelete() ? ('<button class="devis-icon-btn" onclick="_devisDelete(\'' + d.id + '\')" title="Supprimer">🗑️</button>') : '')
             +   '</div>'
@@ -9292,6 +9296,8 @@ window._devisDuplicate = function(id) {
     copy.id = 'DEV-' + Date.now() + '-' + Math.random().toString(36).slice(2,6);
     copy.numero = _devisNextNumero();
     copy.statut = 'brouillon';
+    // Une copie repart de zéro : ni règlements, ni tampon de validation, ni bon de livraison
+    copy.paiements = []; delete copy.validatedAt; delete copy.validationSerial; delete copy.blNumero; delete copy.blDate;
     copy.dateEmission = new Date().toISOString().slice(0,10);
     copy.createdAt = new Date().toISOString();
     const all = _devisGetAll();
@@ -9689,6 +9695,7 @@ window._devisGeneratePDF = function(id) {
         + '</table></div>'
         + (d.notes ? ('<div class="notes">' + d.notes.replace(/</g,'&lt;').replace(/\n/g,'<br>') + '</div>') : '')
         + _devisStampHTML(d)
+        + (window._devisRibHTML ? window._devisRibHTML(d) : '')
         + '<div class="footer">' + docLabel + ' généré' + (docLabel==='Facture'?'e':'') + ' le ' + new Date().toLocaleDateString('fr-FR',{day:'2-digit',month:'long',year:'numeric'}) + ' — ' + shopName.replace(/</g,'&lt;') + '</div>'
         + '</body></html>';
     const w = window.open('', '_blank');
@@ -10948,6 +10955,292 @@ function _bilanInit() {
         window._cpTopbarShow = show; window._cpTopbarHide = function () { pinned = false; hide(0); };
     }
     if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init); else init();
+})();
+</script>
+<script>
+/* ═══════════════════════════════════════════════════════════════════════════
+   GESTION PRO — BON DE LIVRAISON (Devis / Factures)
+   • Disponible dès qu'une facture (devis accepté) est ENTIÈREMENT réglée
+   • Généré automatiquement au règlement qui solde la facture (numéro BL-AAAA-0001,
+     attribué une seule fois et conservé avec la facture → sauvegardes Drive comprises)
+   • Bouton 🚚 dans la liste des factures et dans l'aperçu ; impression / PDF
+   • Contenu : société, client & adresse de livraison, réf. facture, articles et
+     quantités (sans prix), mention « facture réglée », signatures livreur / client
+   ═══════════════════════════════════════════════════════════════════════════ */
+(function () {
+    'use strict';
+    if (window._devisBLInstalled) return;
+    window._devisBLInstalled = true;
+    function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
+
+    // Facture validée + règlement complet
+    window._devisBLReady = function (d) {
+        return !!(d && d.statut === 'accepte' && (parseFloat(d.totalTTC) || 0) > 0 && _devisMontantRegle(d) > 0.004 && _devisResteAPayer(d) <= 0.004);
+    };
+    function nextBL() {
+        var y = new Date().getFullYear(), max = 0;
+        _devisGetAll().forEach(function (x) { var m = /^BL-(\d{4})-(\d{4})$/.exec(x.blNumero || ''); if (m && +m[1] === y) max = Math.max(max, +m[2]); });
+        return 'BL-' + y + '-' + String(max + 1).padStart(4, '0');
+    }
+    function lastPayDate(d) {
+        var ps = Array.isArray(d.paiements) ? d.paiements : [];
+        return ps.reduce(function (m, p) { return (p.date || '') > m ? (p.date || '') : m; }, '');
+    }
+    // Attribue le n° de BL une seule fois ; renvoie la facture à jour
+    function ensureBL(id) {
+        var all = _devisGetAll(), d = all.find(function (x) { return x.id === id; });
+        if (!d || !window._devisBLReady(d)) return null;
+        if (!d.blNumero) { d.blNumero = nextBL(); d.blDate = new Date().toISOString(); _devisSaveAll(all); }
+        return d;
+    }
+    window._devisEnsureBL = ensureBL;
+
+    window._devisGenerateBL = function (id) {
+        var d0 = _devisGetAll().find(function (x) { return x.id === id; });
+        if (!d0) { showScanToast('Facture introuvable'); return; }
+        if (!window._devisBLReady(d0)) {
+            showScanToast(d0.statut !== 'accepte' ? '⚠️ Le bon de livraison est disponible une fois le devis accepté (facture)' : '⚠️ Bon de livraison disponible une fois la facture entièrement réglée (reste ' + _devisFmtEUR(_devisResteAPayer(d0)) + ')', 'info');
+            return;
+        }
+        var w = window.open('', '_blank');   // ouverture immédiate (clic) : jamais bloquée
+        var d = ensureBL(id);
+        if (!w) { showScanToast('Activez les fenêtres pop-up pour afficher le bon de livraison', 'info'); return; }
+        var shop = (appSettings.companyName || appSettings.shopName || 'Mon Entreprise');
+        var rc = (appSettings.rcpt || {});
+        var logo = _devisLogoSrc();
+        var cli = d.client || {};
+        var items = (d.items || []).filter(function (l) { return (l.nom || '').trim() || (parseFloat(l.quantite) || 0) > 0; });
+        var totalQ = items.reduce(function (s, l) { return s + (parseFloat(l.quantite) || 0); }, 0);
+        var rows = items.map(function (l, i) {
+            return '<tr><td class="c">' + (i + 1) + '</td><td>' + esc(l.nom || '') + '</td><td class="c bold">' + esc(l.quantite) + '</td><td class="c">' + esc(l.quantite) + '</td><td class="c"><span class="chk"></span></td></tr>';
+        }).join('');
+        var payD = lastPayDate(d);
+        var modes = (d.paiements || []).map(function (p) { return typeof _devisPaymentModeLabel === 'function' ? _devisPaymentModeLabel(p.mode) : (p.mode || ''); })
+            .filter(function (v, i, a) { return v && a.indexOf(v) === i; }).join(', ');
+        var blD = new Date(d.blDate || Date.now());
+        var html = '<!DOCTYPE html><html lang="fr"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">'
+            + '<title>Bon de livraison ' + esc(d.blNumero) + '</title><style>'
+            + '*{box-sizing:border-box;}body{font-family:Arial,Helvetica,sans-serif;font-size:12px;color:#1e2d3d;margin:0;padding:28px;-webkit-print-color-adjust:exact;print-color-adjust:exact;}'
+            + '.toolbar{padding:0 0 14px;display:flex;justify-content:flex-end;gap:8px;}.toolbar button{padding:9px 18px;border:none;border-radius:8px;cursor:pointer;font-weight:700;font-size:.85rem;background:linear-gradient(135deg,#1b7a43,#145c33);color:#fff;}'
+            + '.head{display:flex;justify-content:space-between;align-items:flex-start;border-bottom:3px solid #1b7a43;padding-bottom:14px;margin-bottom:20px;gap:16px;}'
+            + '.head img{max-height:56px;max-width:180px;object-fit:contain;}.shop{font-size:16px;font-weight:900;color:#1b7a43;}.shopinfo{font-size:10.5px;color:#666;line-height:1.5;margin-top:3px;}'
+            + 'h1{font-size:22px;letter-spacing:2px;margin:0;text-align:right;}.meta{font-size:11px;color:#555;text-align:right;line-height:1.7;}'
+            + '.paid{display:inline-block;margin-top:5px;padding:3px 10px;border-radius:12px;font-size:10px;font-weight:800;background:#e8f5e9;color:#1b5e20;border:1px solid #a5d6a7;}'
+            + '.boxes{display:flex;gap:16px;margin-bottom:18px;}.box{flex:1;background:#f8fafc;border:1px solid #e8eaed;border-radius:8px;padding:12px 14px;}'
+            + '.lbl{font-size:9px;text-transform:uppercase;letter-spacing:.5px;color:#888;font-weight:700;margin-bottom:6px;}.val{font-size:12px;line-height:1.55;}'
+            + 'table{width:100%;border-collapse:collapse;font-size:11.5px;margin-bottom:14px;}th{background:#1b7a43;color:#fff;padding:8px;text-align:left;}'
+            + 'th.c,td.c{text-align:center;}td{padding:8px;border-bottom:1px solid #e8eaed;}.bold{font-weight:700;}'
+            + '.chk{display:inline-block;width:13px;height:13px;border:1.5px solid #1b7a43;border-radius:3px;}'
+            + '.sum{display:flex;justify-content:space-between;background:#f1f8f4;border:1px solid #cfe8d8;border-radius:8px;padding:9px 12px;font-size:11.5px;margin-bottom:16px;}'
+            + '.obs{border:1px dashed #b8c4cf;border-radius:8px;min-height:58px;padding:9px 12px;margin-bottom:18px;font-size:11px;color:#6b7785;}'
+            + '.sign{display:flex;gap:16px;margin-bottom:20px;}.sign .box{min-height:110px;background:#fff;}.sign .line{margin-top:58px;border-top:1px solid #b8c4cf;padding-top:4px;font-size:9.5px;color:#888;}'
+            + '.footer{font-size:9.5px;color:#999;text-align:center;border-top:1px solid #e8eaed;padding-top:10px;}'
+            + '@media print{.toolbar{display:none;}@page{size:A4;margin:16mm;}body{padding:0;}}'
+            + '@media (max-width:600px){body{padding:14px;}.head,.boxes,.sign{flex-direction:column;}h1,.meta{text-align:left;}}'
+            + '</style></head><body>'
+            + '<div class="toolbar"><button onclick="window.print()">🖨️ Imprimer / Enregistrer en PDF</button></div>'
+            + '<div class="head"><div>' + (logo ? '<img src="' + String(logo).replace(/"/g, '') + '" alt="logo"><br>' : '')
+            + '<div class="shop">' + esc(shop) + '</div><div class="shopinfo">' + [rc.address, rc.siret ? 'SIRET ' + rc.siret : '', rc.phone ? '📞 ' + rc.phone : '', rc.email ? '✉️ ' + rc.email : ''].filter(Boolean).map(esc).join('<br>') + '</div></div>'
+            + '<div><h1>BON DE LIVRAISON</h1><div class="meta">N° <b>' + esc(d.blNumero) + '</b><br>Date : ' + blD.toLocaleDateString('fr-FR', { day: '2-digit', month: 'long', year: 'numeric' })
+            + '<br>Réf. facture : <b>' + esc(d.numero) + '</b> du ' + _devisFmtDateFR(d.dateEmission)
+            + '<br><span class="paid">✅ Facture réglée' + (payD ? ' le ' + _devisFmtDateFR(payD.slice(0, 10)) : '') + '</span></div></div></div>'
+            + '<div class="boxes"><div class="box"><div class="lbl">Client</div><div class="val"><strong>' + esc(cli.nom || '—') + '</strong>'
+            + (cli.tel ? '<br>📞 ' + esc(cli.tel) : '') + (cli.email ? '<br>✉️ ' + esc(cli.email) : '') + '</div></div>'
+            + '<div class="box"><div class="lbl">Adresse de livraison</div><div class="val">' + (cli.adresse ? esc(cli.adresse).replace(/\n/g, '<br>') : '<span style="color:#aaa;">—</span>') + '</div></div></div>'
+            + '<table><thead><tr><th class="c" style="width:38px;">#</th><th>Désignation</th><th class="c" style="width:110px;">Qté commandée</th><th class="c" style="width:95px;">Qté livrée</th><th class="c" style="width:70px;">Contrôle</th></tr></thead><tbody>'
+            + (rows || '<tr><td colspan="5" style="text-align:center;color:#999;">Aucun article</td></tr>') + '</tbody></table>'
+            + '<div class="sum"><span><b>' + items.length + '</b> ligne' + (items.length > 1 ? 's' : '') + ' · <b>' + (Math.round(totalQ * 1000) / 1000) + '</b> article' + (totalQ > 1 ? 's' : '') + ' au total</span><span>Règlement : <b>' + _devisFmtEUR(_devisMontantRegle(d)) + '</b>' + (modes ? ' (' + esc(modes) + ')' : '') + '</span></div>'
+            + '<div class="lbl">Observations / réserves à la livraison</div><div class="obs">' + (d.notes ? esc(d.notes).replace(/\n/g, '<br>') : '') + '</div>'
+            + '<div class="sign"><div class="box"><div class="lbl">Livré par</div><div class="line">Nom, date et signature</div></div>'
+            + '<div class="box"><div class="lbl">Reçu par le client</div><div class="line">Nom, date et signature — « Marchandise reçue conforme »</div></div></div>'
+            + '<div class="footer">Bon de livraison ' + esc(d.blNumero) + ' — facture ' + esc(d.numero) + ' — ' + esc(shop) + '</div>'
+            + '</body></html>';
+        w.document.open(); w.document.write(html); w.document.close();
+        if (typeof _devisRenderList === 'function') { try { _devisRenderList(); } catch (e) {} }
+    };
+
+    // Aperçu : bloc « Bon de livraison » + bouton 🚚
+    var op = window._devisOpenPreview;
+    if (typeof op === 'function') window._devisOpenPreview = function (id) {
+        var r = op.apply(this, arguments);
+        var d = _devisGetAll().find(function (x) { return x.id === id; });
+        var btn = document.getElementById('devis-preview-btn-bl'), ready = window._devisBLReady(d);
+        if (btn) { btn.style.display = ready ? '' : 'none'; btn.onclick = function () { window._devisGenerateBL(id); }; }
+        var body = document.getElementById('devis-preview-body');
+        if (body && d && d.statut === 'accepte') {
+            var box = document.createElement('div');
+            box.id = 'devis-preview-bl';
+            box.style.cssText = 'display:flex;align-items:center;gap:12px;border-radius:12px;padding:12px 14px;margin:0 0 14px;' + (ready ? 'background:rgba(39,174,96,.09);border:1.5px solid rgba(39,174,96,.45);' : 'background:var(--bg-body,#f4f7f6);border:1.5px dashed var(--border-color,#ddd);');
+            box.innerHTML = '<div style="font-size:1.6rem;">🚚</div><div style="flex:1;min-width:0;">'
+                + (ready
+                    ? '<div style="font-weight:900;color:#1b7a43;font-size:.9rem;">Bon de livraison ' + (d.blNumero ? esc(d.blNumero) : 'prêt') + '</div><div style="font-size:.74rem;color:var(--text-muted,#888);margin-top:2px;">Facture validée et entièrement réglée' + (d.blDate ? ' · généré le ' + _devisFmtDateFR(d.blDate.slice(0, 10)) : '') + '</div>'
+                    : '<div style="font-weight:800;color:var(--text-main);font-size:.86rem;">Bon de livraison</div><div style="font-size:.74rem;color:var(--text-muted,#888);margin-top:2px;">Disponible dès que la facture est entièrement réglée (reste ' + _devisFmtEUR(_devisResteAPayer(d)) + ').</div>')
+                + '</div>' + (ready ? '<button type="button" onclick="window._devisGenerateBL(\'' + String(d.id).replace(/'/g, '') + '\')" style="padding:9px 14px;border:none;border-radius:9px;background:linear-gradient(135deg,#27ae60,#1b7a43);color:#fff;font-weight:800;font-size:.8rem;cursor:pointer;white-space:nowrap;">🖨️ Afficher</button>' : '');
+            body.insertBefore(box, body.firstChild);
+        }
+        return r;
+    };
+
+    // Règlement qui solde la facture → bon de livraison généré automatiquement
+    var cp = window._devisConfirmPayment;
+    if (typeof cp === 'function') window._devisConfirmPayment = function () {
+        var id = (typeof _devisPaymentDevisId !== 'undefined') ? _devisPaymentDevisId : null;
+        var before = id ? _devisGetAll().find(function (x) { return x.id === id; }) : null;
+        var wasReady = window._devisBLReady(before);
+        var r = cp.apply(this, arguments);
+        var after = id ? _devisGetAll().find(function (x) { return x.id === id; }) : null;
+        if (!wasReady && window._devisBLReady(after)) {
+            window._devisGenerateBL(id);
+            var d2 = _devisGetAll().find(function (x) { return x.id === id; });
+            showScanToast('✅ Facture soldée — bon de livraison ' + ((d2 && d2.blNumero) || '') + ' généré', 'success');
+            try { window._devisOpenPreview(id); } catch (e) {}
+        }
+        return r;
+    };
+})();
+</script>
+<script>
+/* ═══════════════════════════════════════════════════════════════════════════
+   GESTION PRO — COORDONNÉES BANCAIRES (RIB) POUR LES VIREMENTS
+   • Carte en bas de l'onglet Devis / Factures : nom du titulaire, IBAN / n° de RIB,
+     BIC et banque (facultatifs) — enregistrés dans les réglages (covo_settings.rib),
+     donc compris dans les sauvegardes Google Drive
+   • Contrôle de l'IBAN (clé de contrôle) · bouton copier
+   • Imprimés en bas des devis et factures (PDF) et rappelés dans l'aperçu
+   ═══════════════════════════════════════════════════════════════════════════ */
+(function () {
+    'use strict';
+    if (window._devisRibInstalled) return;
+    window._devisRibInstalled = true;
+    function $(id) { return document.getElementById(id); }
+    function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
+    function toast(m, t) { if (typeof showScanToast === 'function') showScanToast(m, t || 'info'); }
+    function getRib() {
+        var r = null;
+        try { r = (typeof appSettings !== 'undefined' && appSettings && appSettings.rib) || null; } catch (e) {}
+        if (!r) { try { r = (JSON.parse(localStorage.getItem('covo_settings') || '{}') || {}).rib || null; } catch (e) {} }
+        return r || {};
+    }
+    window._devisRibGet = getRib;
+    function compact(s) { return String(s || '').replace(/[\s-]+/g, '').toUpperCase(); }
+    function fmtIban(s) { var c = compact(s); return /^[A-Z]{2}\d{2}/.test(c) ? c.replace(/(.{4})/g, '$1 ').trim() : String(s || '').trim(); }
+    // IBAN : vérification de la clé (norme ISO 13616, modulo 97)
+    function ibanState(s) {
+        var c = compact(s);
+        if (!c) return '';
+        if (!/^[A-Z]{2}\d{2}[A-Z0-9]{10,30}$/.test(c)) return 'other';
+        var r = c.slice(4) + c.slice(0, 4), n = '';
+        for (var i = 0; i < r.length; i++) { var ch = r.charCodeAt(i); n += (ch >= 65 && ch <= 90) ? String(ch - 55) : r[i]; }
+        var m = 0; for (var j = 0; j < n.length; j += 7) m = parseInt(String(m) + n.slice(j, j + 7), 10) % 97;
+        return m === 1 ? 'ok' : 'bad';
+    }
+    window._devisIbanState = ibanState;
+
+    // Bloc imprimé en bas des devis / factures
+    window._devisRibHTML = function () {
+        var r = getRib();
+        if (!r.iban || r.show === false) return '';
+        var rows = [['Titulaire du compte', r.titulaire], ['IBAN / RIB', fmtIban(r.iban)], ['BIC', r.bic], ['Banque', r.banque]].filter(function (x) { return x[1]; });
+        return '<div style="border:1.5px solid #2c6fad;border-radius:8px;padding:10px 14px;margin:22px 0 16px;page-break-inside:avoid;clear:both;">'
+            + '<div style="font-size:9px;text-transform:uppercase;letter-spacing:.5px;color:#2c6fad;font-weight:800;margin-bottom:6px;">🏦 Règlement par virement bancaire</div>'
+            + '<table style="width:100%;border-collapse:collapse;font-size:11px;margin:0;">' + rows.map(function (x) {
+                return '<tr><td style="padding:2px 0;border:none;color:#777;width:150px;">' + esc(x[0]) + '</td><td style="padding:2px 0;border:none;font-weight:700;font-family:' + (x[0] === 'IBAN / RIB' || x[0] === 'BIC' ? 'Consolas,monospace' : 'inherit') + ';letter-spacing:' + (x[0] === 'IBAN / RIB' ? '.5px' : '0') + ';">' + esc(x[1]) + '</td></tr>';
+            }).join('') + '</table></div>';
+    };
+
+    // ── Carte de saisie en bas de l'onglet ──
+    var css = document.createElement('style');
+    css.textContent = [
+        '#devis-rib-card{margin-top:22px;border:1.5px solid var(--border-color,#e5e7eb);border-radius:14px;background:var(--bg-card,#fff);overflow:hidden;}',
+        '#devis-rib-card .rh{display:flex;align-items:center;gap:12px;padding:13px 16px;background:linear-gradient(135deg,rgba(44,111,173,.10),rgba(44,111,173,.03));border-bottom:1px solid var(--border-color,#e5e7eb);}',
+        '#devis-rib-card .rh .ic{width:38px;height:38px;border-radius:11px;background:linear-gradient(135deg,#2c6fad,#1b456b);display:flex;align-items:center;justify-content:center;font-size:1.1rem;flex-shrink:0;}',
+        '#devis-rib-card .rh b{display:block;font-size:.95rem;font-weight:900;color:var(--text-main);}',
+        '#devis-rib-card .rh small{display:block;font-size:.72rem;color:var(--text-muted,#888);margin-top:1px;}',
+        '#devis-rib-card .rb{padding:14px 16px;display:grid;grid-template-columns:1fr 1fr;gap:12px;}',
+        '#devis-rib-card label{display:flex;flex-direction:column;gap:5px;font-size:.72rem;font-weight:800;color:var(--text-muted,#888);text-transform:uppercase;letter-spacing:.3px;}',
+        '#devis-rib-card input[type=text]{padding:10px 12px;border:1.5px solid var(--border-color,#ddd);border-radius:9px;font-size:.88rem;background:var(--input-bg,#fff);color:var(--text-main);text-transform:none;letter-spacing:0;font-weight:600;}',
+        '#devis-rib-card input[type=text]:focus{outline:none;border-color:#2c6fad;box-shadow:0 0 0 3px rgba(44,111,173,.15);}',
+        '#devis-rib-card #devis-rib-iban{font-family:Consolas,monospace;letter-spacing:.5px;}',
+        '#devis-rib-card .full{grid-column:1/-1;}',
+        '#devis-rib-card .st{font-size:.72rem;font-weight:700;text-transform:none;letter-spacing:0;min-height:1em;}',
+        '#devis-rib-card .st.ok{color:#1b7a43;}#devis-rib-card .st.bad{color:#c0392b;}#devis-rib-card .st.other{color:var(--text-muted,#888);}',
+        '#devis-rib-card .rf{display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:0 16px 14px;}',
+        '#devis-rib-card .rf .chk{display:flex;flex-direction:row;align-items:center;gap:7px;font-size:.78rem;font-weight:700;color:var(--text-main);cursor:pointer;}',
+        '#devis-rib-card .rf button{padding:9px 16px;border-radius:9px;font-weight:800;font-size:.82rem;cursor:pointer;}',
+        '#devis-rib-card .rf .save{margin-left:auto;border:none;background:linear-gradient(135deg,#2c6fad,#1b456b);color:#fff;}',
+        '#devis-rib-card .rf .copy{border:1.5px solid var(--border-color,#ddd);background:var(--bg-card,#fff);color:var(--text-main);}',
+        '@media (max-width:600px){#devis-rib-card .rb{grid-template-columns:1fr;}#devis-rib-card .rf .save{margin-left:0;flex:1;}}'
+    ].join('\n');
+
+    function fill() {
+        var r = getRib();
+        if (!$('devis-rib-card')) return;
+        $('devis-rib-titulaire').value = r.titulaire || '';
+        $('devis-rib-iban').value = r.iban ? fmtIban(r.iban) : '';
+        $('devis-rib-bic').value = r.bic || '';
+        $('devis-rib-banque').value = r.banque || '';
+        $('devis-rib-show').checked = r.show !== false;
+        status();
+    }
+    function status() {
+        var el = $('devis-rib-iban-st'); if (!el) return;
+        var s = ibanState($('devis-rib-iban').value);
+        el.className = 'st ' + s;
+        el.textContent = s === 'ok' ? '✓ IBAN valide' : s === 'bad' ? '⚠️ IBAN incorrect : vérifiez les chiffres (clé de contrôle invalide)' : s === 'other' ? 'Format libre (n° de RIB) — enregistré tel quel' : '';
+    }
+    window._devisRibSave = function () {
+        var titulaire = $('devis-rib-titulaire').value.trim(), ibanRaw = $('devis-rib-iban').value.trim();
+        if (ibanRaw && !titulaire) { toast('⚠️ Indiquez le nom du titulaire du compte', 'info'); $('devis-rib-titulaire').focus(); return; }
+        if (ibanState(ibanRaw) === 'bad' && !confirm('L’IBAN saisi ne semble pas valide (clé de contrôle). Enregistrer quand même ?')) return;
+        var rib = { titulaire: titulaire, iban: /^[A-Z]{2}\d{2}/i.test(compact(ibanRaw)) ? compact(ibanRaw) : ibanRaw, bic: compact($('devis-rib-bic').value), banque: $('devis-rib-banque').value.trim(), show: $('devis-rib-show').checked, updatedAt: new Date().toISOString() };
+        var s = {}; try { s = JSON.parse(localStorage.getItem('covo_settings') || '{}') || {}; } catch (e) {}
+        if (rib.iban || rib.titulaire) s.rib = rib; else delete s.rib;
+        try { if (typeof appSettings !== 'undefined' && appSettings) { if (s.rib) appSettings.rib = rib; else delete appSettings.rib; } } catch (e) {}
+        try { localStorage.setItem('covo_settings', JSON.stringify(s)); } catch (e) { toast('⚠️ Enregistrement impossible : mémoire du navigateur pleine', 'error'); return; }
+        if (typeof cpDriveMarkDirty === 'function') { try { cpDriveMarkDirty(); } catch (e) {} }
+        fill();
+        toast(s.rib ? '🏦 Coordonnées bancaires enregistrées' : 'Coordonnées bancaires effacées', 'success');
+    };
+    window._devisRibCopy = function () {
+        var r = getRib(); if (!r.iban) { toast('Aucun RIB enregistré', 'info'); return; }
+        var txt = [r.titulaire ? 'Titulaire : ' + r.titulaire : '', 'IBAN : ' + fmtIban(r.iban), r.bic ? 'BIC : ' + r.bic : '', r.banque ? 'Banque : ' + r.banque : ''].filter(Boolean).join('\n');
+        var done = function () { toast('📋 RIB copié', 'success'); };
+        if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(txt).then(done, fb); else fb();
+        function fb() { try { var t = document.createElement('textarea'); t.value = txt; t.style.position = 'fixed'; t.style.opacity = '0'; document.body.appendChild(t); t.select(); document.execCommand('copy'); t.remove(); done(); } catch (e) { toast('Copie impossible', 'error'); } }
+    };
+    function build() {
+        var host = $('devis-rib-host'); if (!host || $('devis-rib-card')) return;
+        document.head.appendChild(css);
+        host.innerHTML = '<div id="devis-rib-card">'
+            + '<div class="rh"><span class="ic">🏦</span><div><b>Coordonnées bancaires — virement</b><small>Imprimées en bas de vos devis et factures pour que le client puisse payer par virement</small></div></div>'
+            + '<div class="rb">'
+            + '<label>Nom du titulaire du compte<input type="text" id="devis-rib-titulaire" maxlength="80" placeholder="ex. COVO SARL ou Jean Dupont" autocomplete="off"></label>'
+            + '<label><span>Banque <i style="font-style:normal;text-transform:none;font-weight:600;">(facultatif)</i></span><input type="text" id="devis-rib-banque" maxlength="60" placeholder="ex. BRED, Crédit Agricole…" autocomplete="off"></label>'
+            + '<label class="full">IBAN / numéro du RIB<input type="text" id="devis-rib-iban" maxlength="60" placeholder="FR76 1234 5678 9012 3456 7890 123" autocomplete="off" spellcheck="false"><span class="st" id="devis-rib-iban-st"></span></label>'
+            + '<label><span>BIC / SWIFT <i style="font-style:normal;text-transform:none;font-weight:600;">(facultatif)</i></span><input type="text" id="devis-rib-bic" maxlength="11" placeholder="ex. BREDFRPPXXX" autocomplete="off" spellcheck="false"></label>'
+            + '</div>'
+            + '<div class="rf"><label class="chk" style="text-transform:none;letter-spacing:0;"><input type="checkbox" id="devis-rib-show"> Afficher sur les devis et factures</label>'
+            + '<button type="button" class="copy" onclick="window._devisRibCopy()">📋 Copier le RIB</button>'
+            + '<button type="button" class="save" onclick="window._devisRibSave()">💾 Enregistrer</button></div>'
+            + '</div>';
+        $('devis-rib-iban').addEventListener('input', status);
+        $('devis-rib-iban').addEventListener('blur', function () { if (/^[A-Z]{2}\d{2}/i.test(compact(this.value))) this.value = fmtIban(this.value); status(); });
+        $('devis-rib-card').addEventListener('keydown', function (e) { if (e.key === 'Enter' && e.target.tagName === 'INPUT' && e.target.type === 'text') { e.preventDefault(); window._devisRibSave(); } });
+        fill();
+    }
+    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', build); else build();
+    // Rafraîchir à l'ouverture de l'onglet (réglages restaurés depuis Drive, autre appareil…)
+    var gs = window.gstShowTab;
+    if (typeof gs === 'function') window.gstShowTab = function (id) { var r = gs.apply(this, arguments); if (id === 'gst-devis') { build(); fill(); } return r; };
+
+    // Aperçu d'un devis / d'une facture : rappel du RIB en bas
+    var op = window._devisOpenPreview;
+    if (typeof op === 'function') window._devisOpenPreview = function (id) {
+        var r = op.apply(this, arguments);
+        var body = $('devis-preview-body'), h = window._devisRibHTML();
+        if (body && h) { var d = document.createElement('div'); d.id = 'devis-preview-rib'; d.innerHTML = h; d.firstChild.style.borderRadius = '10px'; body.appendChild(d); }
+        return r;
+    };
 })();
 </script>
 </body>
