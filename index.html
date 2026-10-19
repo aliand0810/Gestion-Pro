@@ -11018,7 +11018,7 @@ function _bilanInit() {
         var items = (d.items || []).filter(function (l) { return (l.nom || '').trim() || (parseFloat(l.quantite) || 0) > 0; });
         var totalQ = items.reduce(function (s, l) { return s + (parseFloat(l.quantite) || 0); }, 0);
         var rows = items.map(function (l, i) {
-            return '<tr><td class="c">' + (i + 1) + '</td><td>' + esc(l.nom || '') + '</td><td class="c bold">' + esc(l.quantite) + '</td><td class="c">' + esc(l.quantite) + '</td><td class="c"><span class="chk"></span></td></tr>';
+            return '<tr><td class="c">' + (i + 1) + '</td><td>' + esc(l.nom || '') + '</td><td class="c bold">' + esc(l.quantite) + '</td><td class="c">' + (function () { var lq = window._devisLivreQty ? window._devisLivreQty(d, l) : null; return lq == null ? esc(l.quantite) : '<b>' + esc(lq) + '</b>' + (lq < (parseFloat(l.quantite) || 0) ? '<br><small style="color:#b45309;font-weight:700;">reste ' + esc(Math.round(((parseFloat(l.quantite) || 0) - lq) * 1000) / 1000) + '</small>' : ''); })() + '</td><td class="c"><span class="chk"></span></td></tr>';
         }).join('');
         var payD = lastPayDate(d);
         var modes = (d.paiements || []).map(function (p) { return typeof _devisPaymentModeLabel === 'function' ? _devisPaymentModeLabel(p.mode) : (p.mode || ''); })
@@ -11057,7 +11057,7 @@ function _bilanInit() {
             + '<div class="box"><div class="lbl">Adresse de livraison</div><div class="val">' + (cli.adresse ? esc(cli.adresse).replace(/\n/g, '<br>') : '<span style="color:#aaa;">—</span>') + '</div></div></div>'
             + '<table><thead><tr><th class="c" style="width:38px;">#</th><th>Désignation</th><th class="c" style="width:110px;">Qté commandée</th><th class="c" style="width:95px;">Qté livrée</th><th class="c" style="width:70px;">Contrôle</th></tr></thead><tbody>'
             + (rows || '<tr><td colspan="5" style="text-align:center;color:#999;">Aucun article</td></tr>') + '</tbody></table>'
-            + '<div class="sum"><span><b>' + items.length + '</b> ligne' + (items.length > 1 ? 's' : '') + ' · <b>' + (Math.round(totalQ * 1000) / 1000) + '</b> article' + (totalQ > 1 ? 's' : '') + ' au total</span><span>' + (payState(d) === 'paid' ? '✅ Facture ' + esc(d.numero) + ' réglée' + (modes ? ' (' + esc(modes) + ')' : '') : (payState(d) === 'part' ? '🟡 Facture ' + esc(d.numero) + ' partiellement réglée' : '⏳ Facture ' + esc(d.numero) + ' — règlement en attente')) + '</span></div>'
+            + '<div class="sum"><span><b>' + items.length + '</b> ligne' + (items.length > 1 ? 's' : '') + ' · <b>' + (Math.round(totalQ * 1000) / 1000) + '</b> article' + (totalQ > 1 ? 's' : '') + ' au total' + (function () { if (!window._devisLivreQty || !d.livraison) return ''; var rst = items.reduce(function (a, l) { var lq = window._devisLivreQty(d, l); return a + (lq == null ? 0 : Math.max(0, (parseFloat(l.quantite) || 0) - lq)); }, 0); rst = Math.round(rst * 1000) / 1000; return rst > 0 ? ' · <b style="color:#b45309;">' + rst + ' restant' + (rst > 1 ? 's' : '') + ' à livrer</b>' : ' · <b>livraison complète</b>'; })() + '</span><span>' + (payState(d) === 'paid' ? '✅ Facture ' + esc(d.numero) + ' réglée' + (modes ? ' (' + esc(modes) + ')' : '') : (payState(d) === 'part' ? '🟡 Facture ' + esc(d.numero) + ' partiellement réglée' : '⏳ Facture ' + esc(d.numero) + ' — règlement en attente')) + '</span></div>'
             + '<div class="lbl">Observations / réserves à la livraison</div><div class="obs">' + (d.notes ? esc(d.notes).replace(/\n/g, '<br>') : '') + '</div>'
             + '<div class="sign"><div class="box"><div class="lbl">Livré par</div><div class="fld">Nom :</div><div class="line">Signature</div></div>'
             + '<div class="box rec"><div class="lbl">Bon pour réception — le client</div>'
@@ -11283,6 +11283,817 @@ function _bilanInit() {
         var pdf = document.getElementById('devis-preview-btn-pdf'), bl = document.getElementById('devis-preview-btn-bl');
         if (pdf && d) pdf.textContent = d.statut === 'accepte' ? '🧾 Facture complète' : '🖨️ PDF';
         if (pdf && bl && pdf.nextElementSibling !== bl) pdf.parentNode.insertBefore(bl, pdf.nextSibling);
+        return r;
+    };
+})();
+</script>
+<script>
+/* ════════════════════════════════════════════════════════════════════════
+   GESTION PRO — ENVOI DES DEVIS ET FACTURES PAR E-MAIL OU WHATSAPP
+   • Bouton 📤 sur chaque devis / facture (liste) et « 📤 Envoyer » dans l'aperçu
+   • Choix du document : devis, facture complète, bon de livraison, ou facture + bon de livraison
+   • Destinataire pré-rempli depuis la fiche (e-mail, téléphone) — numéro WhatsApp converti au
+     format international (0692… → +262 692…, 0690… → +590…, 0694… → +594…, 0696… → +596…, sinon +33)
+   • Message prêt à l'emploi (modifiable) : n°, date, montant, reste à payer, RIB pour un virement
+   • Envoi : WhatsApp (wa.me), messagerie (mailto), Gmail, ou partage du PDF joint (téléphone :
+     WhatsApp, Gmail… avec le fichier attaché) ; PDF téléchargeable pour le joindre sur ordinateur
+   • Historique des envois sur le document ; un devis « Brouillon » envoyé passe à « Envoyé »
+   ════════════════════════════════════════════════════════════════════════ */
+(function () {
+    'use strict';
+    if (window._devisSendInstalled) return;
+    window._devisSendInstalled = true;
+
+    var H2P = 'https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js';
+    function $(id) { return document.getElementById(id); }
+    function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
+    function toast(m, t) { if (typeof showScanToast === 'function') showScanToast(m, t || 'info'); }
+    function eur(n) { return typeof _devisFmtEUR === 'function' ? _devisFmtEUR(n) : (parseFloat(n) || 0).toFixed(2).replace('.', ',') + ' €'; }
+    function dFr(s) { try { return typeof _devisFmtDateFR === 'function' ? _devisFmtDateFR(String(s || '').slice(0, 10)) : String(s || ''); } catch (e) { return String(s || ''); } }
+    function getD(id) { return _devisGetAll().find(function (x) { return x.id === id; }) || null; }
+    function isFact(d) { return !!(d && d.statut === 'accepte'); }
+    function blReady(d) { return !!(window._devisBLReady && window._devisBLReady(d)); }
+    function shop() { try { return (appSettings.companyName || appSettings.shopName || 'Mon Entreprise'); } catch (e) { return 'Mon Entreprise'; } }
+    function regle(d) { try { return _devisMontantRegle(d); } catch (e) { return 0; } }
+    function reste(d) { try { return _devisResteAPayer(d); } catch (e) { return parseFloat(d.totalTTC) || 0; } }
+    function safeName(s) { return String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^A-Za-z0-9_-]+/g, '_').replace(/^_+|_+$/g, '').slice(0, 40); }
+
+    /* ───────────── Numéro WhatsApp (format international) ───────────── */
+    var CC = [[['0692', '0693', '0639', '0262', '0263', '0269'], '262'], [['0690', '0691', '0590'], '590'], [['0694', '0594'], '594'], [['0696', '0697', '0596'], '596']];
+    function waNumber(raw) {
+        var s = String(raw || '').trim(); if (!s) return '';
+        var dg = s.replace(/\D/g, '');
+        if (/^\+/.test(s)) return dg;
+        if (/^00/.test(dg)) return dg.slice(2);
+        if (dg.length === 10 && dg.charAt(0) === '0') {
+            var p = dg.slice(0, 4), cc = '33';
+            CC.forEach(function (c) { if (c[0].indexOf(p) >= 0) cc = c[1]; });
+            return cc + dg.slice(1);
+        }
+        return dg;
+    }
+    function waPretty(n) {
+        if (!n) return '';
+        var cc = /^(262|590|594|596)/.test(n) ? n.slice(0, 3) : (/^33/.test(n) ? '33' : '');
+        var rest = cc ? n.slice(cc.length) : n;
+        var f = rest.replace(/(\d{3})(\d{2})(\d{2})(\d{2})$/, '$1 $2 $3 $4');
+        if (cc === '33') f = f.replace(/^(\d)(\d{2}) (\d{2}) (\d{2}) (\d{2})$/, '$1 $2 $3 $4 $5');
+        return '+' + (cc ? cc + ' ' : '') + f;
+    }
+    window._devisWaNumber = waNumber;
+
+    /* ───────────── Capture du document (sans ouvrir de fenêtre) ───────────── */
+    function captureHTML(kind, id) {
+        var html = '', real = window.open;
+        var fake = { closed: false, document: { open: function () { html = ''; }, write: function (h) { html += h; }, close: function () {} }, focus: function () {}, print: function () {}, close: function () {} };
+        window.open = function () { return fake; };
+        try { if (kind === 'bl') window._devisGenerateBL(id); else window._devisGeneratePDF(id); }
+        finally { window.open = real; }
+        return html || null;
+    }
+    /* ───────────── HTML → PDF (html2pdf.js chargé à la demande, dans un cadre isolé) ───────────── */
+    function renderPDF(html) {
+        return new Promise(function (resolve, reject) {
+            var fr = document.createElement('iframe');
+            fr.setAttribute('aria-hidden', 'true'); fr.tabIndex = -1;
+            fr.style.cssText = 'position:fixed;left:-12000px;top:0;width:726px;height:1123px;border:0;opacity:0;pointer-events:none;';
+            document.body.appendChild(fr);
+            var done = false, timer = setTimeout(function () { fail(new Error('délai dépassé')); }, 45000);
+            function clean() { clearTimeout(timer); setTimeout(function () { try { fr.remove(); } catch (e) {} }, 50); }
+            function fail(e) { if (done) return; done = true; clean(); reject(e); }
+            try {
+                var doc = fr.contentDocument;
+                doc.open(); doc.write(html); doc.close();
+                Array.prototype.forEach.call(doc.querySelectorAll('.toolbar'), function (x) { x.remove(); });
+                var st = doc.createElement('style');
+                st.textContent = 'html,body{padding:0!important;margin:0!important;width:726px!important;max-width:none!important;overflow:visible!important;} tr,.box,.totals,.notes,.sign,.datebox{page-break-inside:avoid;break-inside:avoid;}';
+                doc.head.appendChild(st);
+                var sc = doc.createElement('script');
+                sc.src = H2P;
+                sc.onerror = function () { fail(new Error('Module PDF indisponible (connexion internet ?)')); };
+                sc.onload = function () {
+                    var imgs = Array.prototype.slice.call(doc.images || []);
+                    Promise.all(imgs.map(function (im) { return im.complete ? 0 : new Promise(function (r) { im.onload = im.onerror = r; setTimeout(r, 4000); }); })).then(function () {
+                        try {
+                            // Options créées dans le contexte du cadre (html2pdf vérifie les tableaux avec instanceof)
+                            var opts = fr.contentWindow.JSON.parse(JSON.stringify({
+                                margin: [10, 9, 12, 9], filename: 'document.pdf',
+                                image: { type: 'jpeg', quality: 0.95 },
+                                html2canvas: { scale: 2, useCORS: true, logging: false, backgroundColor: '#ffffff', scrollX: 0, scrollY: 0 },
+                                jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
+                                pagebreak: { mode: ['css', 'legacy'] }
+                            }));
+                            fr.contentWindow.html2pdf().set(opts).from(doc.body).outputPdf('blob').then(function (b) {
+                                if (done) return; done = true; clean();
+                                resolve(new Blob([b], { type: 'application/pdf' }));
+                            }, fail);
+                        } catch (e) { fail(e); }
+                    });
+                };
+                doc.head.appendChild(sc);
+            } catch (e) { fail(e); }
+        });
+    }
+    function fileName(kind, d) {
+        var lbl = kind === 'bl' ? 'Bon_de_livraison_' + (d.blNumero || d.numero) : (isFact(d) ? 'Facture_' : 'Devis_') + d.numero;
+        var c = safeName(d.client && d.client.nom);
+        return safeName(lbl) + (c ? '_' + c : '') + '.pdf';
+    }
+    function buildFiles(id, choice) {
+        var kinds = choice === 'both' ? ['doc', 'bl'] : [choice];
+        return kinds.reduce(function (p, k) {
+            return p.then(function (acc) {
+                var html = captureHTML(k, id); if (!html) throw new Error('Document introuvable');
+                var d = getD(id);
+                return renderPDF(html).then(function (blob) { acc.push(new File([blob], fileName(k, d), { type: 'application/pdf' })); return acc; });
+            });
+        }, Promise.resolve([]));
+    }
+    function download(files) {
+        files.forEach(function (f, i) {
+            setTimeout(function () {
+                var a = document.createElement('a'); a.href = URL.createObjectURL(f); a.download = f.name;
+                document.body.appendChild(a); a.click(); setTimeout(function () { URL.revokeObjectURL(a.href); a.remove(); }, 4000);
+            }, i * 400);
+        });
+    }
+    function canShareFiles() {
+        try { if (!navigator.share || !navigator.canShare) return false; return navigator.canShare({ files: [new File([new Blob(['%PDF-1.4'], { type: 'application/pdf' })], 'test.pdf', { type: 'application/pdf' })] }); } catch (e) { return false; }
+    }
+
+    /* ───────────── Message ───────────── */
+    function message(d, choice, detail) {
+        var nom = (d.client && d.client.nom || '').trim(), fact = isFact(d), lines = [];
+        var exp = null; try { exp = _devisExpiryDate(d); } catch (e) {}
+        lines.push('Bonjour' + (nom ? ' ' + nom : '') + ',', '');
+        var docTxt = fact ? 'la facture n° ' + d.numero : 'notre devis n° ' + d.numero;
+        if (choice === 'bl') lines.push('Veuillez trouver ci-joint le bon de livraison' + (d.blNumero ? ' n° ' + d.blNumero : '') + ' correspondant à la facture n° ' + d.numero + '.');
+        else if (choice === 'both') lines.push('Veuillez trouver ci-joint ' + docTxt + ' du ' + dFr(d.dateEmission) + ' ainsi que le bon de livraison' + (d.blNumero ? ' n° ' + d.blNumero : '') + '.');
+        else lines.push('Veuillez trouver ci-joint ' + docTxt + ' du ' + dFr(d.dateEmission) + '.');
+        if (detail) {
+            lines.push('');
+            (d.items || []).filter(function (l) { return (l.nom || '').trim(); }).forEach(function (l) {
+                var q = parseFloat(l.quantite) || 0, pu = parseFloat(l.prixUnitaire) || 0;
+                lines.push('• ' + q + ' × ' + l.nom + (choice === 'bl' ? '' : ' — ' + eur(q * pu)));
+            });
+        }
+        if (choice !== 'bl') {
+            lines.push('', 'Montant total' + (d.tvaPct ? ' TTC' : '') + ' : ' + eur(d.totalTTC));
+            if (fact) {
+                var rg = regle(d), rs = reste(d);
+                if (rg > 0.004 && rs <= 0.004) lines.push('Facture acquittée — merci pour votre règlement.');
+                else {
+                    if (rg > 0.004) lines.push('Déjà réglé : ' + eur(rg) + ' — reste à payer : ' + eur(rs));
+                    var rib = (window._devisRibGet && window._devisRibGet()) || {};
+                    if (rib.iban) lines.push('', 'Règlement par virement :', 'IBAN : ' + String(rib.iban).replace(/(.{4})/g, '$1 ').trim() + (rib.bic ? '\nBIC : ' + rib.bic : '') + (rib.titulaire ? '\nTitulaire : ' + rib.titulaire : ''));
+                }
+            } else if (exp) lines.push('Offre valable jusqu’au ' + dFr(exp.toISOString().slice(0, 10)) + '.', '', 'Pour l’accepter, il vous suffit de répondre à ce message.');
+        }
+        lines.push('', 'Cordialement,', shop());
+        return lines.join('\n');
+    }
+    function subject(d, choice) {
+        if (choice === 'bl') return 'Bon de livraison ' + (d.blNumero || '') + ' — facture ' + d.numero + ' — ' + shop();
+        return (isFact(d) ? 'Facture ' : 'Devis ') + d.numero + (choice === 'both' ? ' + bon de livraison' : '') + ' — ' + shop();
+    }
+
+    /* ───────────── Styles + fenêtre ───────────── */
+    var css = document.createElement('style');
+    css.id = 'dsn-css';
+    css.textContent = [
+        '#dsn-modal{display:none;position:fixed;inset:0;z-index:99920;background:rgba(0,0,0,.62);backdrop-filter:blur(6px);align-items:flex-start;justify-content:center;overflow-y:auto;padding:24px 12px;}',
+        '#dsn-modal.open{display:flex;}',
+        '.dsn-box{background:var(--bg-card,#fff);color:var(--text-main,#1e2d3d);border-radius:16px;width:100%;max-width:640px;box-shadow:0 24px 60px rgba(0,0,0,.4);overflow:hidden;}',
+        '.dsn-hd{background:linear-gradient(135deg,#0f766e,#115e59);color:#fff;padding:15px 18px;display:flex;align-items:center;gap:12px;}',
+        '.dsn-hd b{display:block;font-size:1rem;font-weight:900;}.dsn-hd small{display:block;font-size:.74rem;opacity:.85;margin-top:2px;}',
+        '.dsn-x{margin-left:auto;background:rgba(255,255,255,.2);border:none;color:#fff;width:32px;height:32px;border-radius:50%;cursor:pointer;font-size:1rem;flex-shrink:0;}',
+        '.dsn-bd{padding:16px 18px;display:flex;flex-direction:column;gap:14px;}',
+        '.dsn-l{font-size:.68rem;font-weight:800;text-transform:uppercase;letter-spacing:.4px;color:var(--text-muted,#64748b);display:block;margin-bottom:5px;}',
+        '.dsn-docs{display:flex;gap:6px;flex-wrap:wrap;}',
+        '.dsn-docs button{flex:1;min-width:130px;border:2px solid var(--border-color,#e2e8f0);background:var(--bg-card,#fff);color:var(--text-main,#1e2d3d);border-radius:11px;padding:9px 8px;font-weight:800;font-size:.8rem;cursor:pointer;font-family:inherit;}',
+        '.dsn-docs button.on{border-color:#0f766e;background:rgba(15,118,110,.09);color:#0f766e;}',
+        'body.dark-mode .dsn-docs button.on{color:#5eead4;}',
+        '.dsn-g2{display:grid;grid-template-columns:1fr 1fr;gap:10px;}',
+        '.dsn-bd input[type=email],.dsn-bd input[type=tel],.dsn-bd textarea{width:100%;box-sizing:border-box;padding:10px 12px;border:1.5px solid var(--border-color,#e2e8f0);border-radius:10px;font-size:.88rem;background:var(--input-bg,var(--bg-card,#fff));color:var(--text-main,#1e2d3d);font-family:inherit;}',
+        '.dsn-bd textarea{min-height:190px;resize:vertical;line-height:1.45;font-size:.84rem;}',
+        '.dsn-bd input:focus,.dsn-bd textarea:focus{outline:none;border-color:#0f766e;box-shadow:0 0 0 4px rgba(15,118,110,.12);}',
+        '.dsn-hint{font-size:.7rem;font-weight:700;color:var(--text-muted,#64748b);margin-top:4px;min-height:14px;}',
+        '.dsn-hint.ok{color:#15803d;}.dsn-hint.bad{color:#dc2626;}',
+        '.dsn-chk{display:flex;align-items:center;gap:7px;font-size:.76rem;font-weight:700;color:var(--text-main,#1e2d3d);cursor:pointer;}',
+        '.dsn-chk input{width:16px;height:16px;accent-color:#0f766e;}',
+        '.dsn-acts{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;}',
+        '.dsn-acts button,.dsn-row2 button{border:none;border-radius:11px;padding:11px 8px;font-weight:800;font-size:.84rem;cursor:pointer;color:#fff;font-family:inherit;display:flex;align-items:center;justify-content:center;gap:6px;}',
+        '.dsn-wa{background:linear-gradient(135deg,#25d366,#128c7e);}',
+        '.dsn-mail{background:linear-gradient(135deg,#2c6fad,#1b456b);}',
+        '.dsn-gm{background:linear-gradient(135deg,#ea4335,#b3261e);}',
+        '.dsn-row2{display:grid;grid-template-columns:1fr 1fr;gap:8px;}',
+        '.dsn-share{background:linear-gradient(135deg,#7c3aed,#4c1d95);}',
+        '.dsn-dl{background:var(--bg-card,#fff)!important;color:var(--text-main,#1e2d3d)!important;border:1.5px solid var(--border-color,#e2e8f0)!important;}',
+        '.dsn-row2 button:disabled{opacity:.55;cursor:wait;}',
+        '.dsn-pdf{font-size:.72rem;font-weight:700;border-radius:10px;padding:8px 11px;background:rgba(15,118,110,.07);color:var(--text-main,#1e2d3d);line-height:1.4;}',
+        '.dsn-pdf.err{background:rgba(220,38,38,.08);color:#b91c1c;}',
+        '.dsn-hist{border-top:1px dashed var(--border-color,#e2e8f0);padding-top:10px;font-size:.74rem;}',
+        '.dsn-hist div{display:flex;justify-content:space-between;gap:8px;padding:3px 0;color:var(--text-muted,#64748b);font-weight:600;}',
+        '.dsn-hist b{color:var(--text-main,#1e2d3d);font-weight:800;}',
+        '.dsn-pv{margin-top:14px;border:1.5px solid rgba(15,118,110,.3);background:rgba(15,118,110,.06);border-radius:10px;padding:9px 12px;font-size:.76rem;}',
+        '.dsn-pv .t{font-weight:900;color:#0f766e;margin-bottom:3px;}',
+        'body.dark-mode .dsn-pv .t{color:#5eead4;}',
+        '.dsn-pv div.r{display:flex;justify-content:space-between;gap:8px;padding:2px 0;color:var(--text-muted,#64748b);font-weight:600;}',
+        '@media (max-width:560px){.dsn-g2{grid-template-columns:1fr;}.dsn-acts{grid-template-columns:1fr 1fr;}.dsn-acts .dsn-wa{grid-column:1/-1;}.dsn-row2{grid-template-columns:1fr;}}'
+    ].join('\n');
+    document.head.appendChild(css);
+
+    var M = null, cur = { id: null, choice: 'doc', files: null, pending: null, edited: false, gen: 0 };
+    function build() {
+        if (M) return M;
+        M = document.createElement('div');
+        M.id = 'dsn-modal'; M.setAttribute('role', 'dialog'); M.setAttribute('aria-modal', 'true'); M.setAttribute('aria-labelledby', 'dsn-title');
+        M.innerHTML = '<div class="dsn-box"><div class="dsn-hd"><span style="font-size:1.5rem;">📤</span><span style="min-width:0;"><b id="dsn-title">Envoyer</b><small id="dsn-sub"></small></span><button type="button" class="dsn-x" data-dsn="close" aria-label="Fermer">✕</button></div>'
+            + '<div class="dsn-bd">'
+            + '<div><span class="dsn-l">Document à envoyer</span><div class="dsn-docs" id="dsn-docs"></div></div>'
+            + '<div class="dsn-g2"><div><label class="dsn-l" for="dsn-email">✉️ Adresse e-mail</label><input type="email" id="dsn-email" placeholder="client@exemple.fr" autocomplete="off"><div class="dsn-hint" id="dsn-email-h"></div></div>'
+            + '<div><label class="dsn-l" for="dsn-tel">🟢 N° WhatsApp</label><input type="tel" id="dsn-tel" placeholder="0692 12 34 56" autocomplete="off"><div class="dsn-hint" id="dsn-tel-h"></div></div></div>'
+            + '<div><label class="dsn-l" for="dsn-msg">💬 Message</label><textarea id="dsn-msg"></textarea>'
+            + '<div style="display:flex;gap:14px;flex-wrap:wrap;margin-top:6px;"><label class="dsn-chk"><input type="checkbox" id="dsn-detail"> Inclure le détail des articles</label><label class="dsn-chk"><input type="checkbox" id="dsn-auto-dl"> Télécharger aussi le PDF pour le joindre</label></div></div>'
+            + '<div class="dsn-acts"><button type="button" class="dsn-wa" data-dsn="wa">🟢 WhatsApp</button><button type="button" class="dsn-mail" data-dsn="mail">✉️ Messagerie</button><button type="button" class="dsn-gm" data-dsn="gmail">📧 Gmail</button></div>'
+            + '<div class="dsn-row2"><button type="button" class="dsn-share" data-dsn="share" id="dsn-share">📎 Partager avec le PDF joint</button><button type="button" class="dsn-dl" data-dsn="dl" id="dsn-dl">⬇️ Télécharger le PDF</button></div>'
+            + '<div class="dsn-pdf" id="dsn-pdf"></div>'
+            + '<div class="dsn-hist" id="dsn-hist"></div>'
+            + '</div></div>';
+        document.body.appendChild(M);
+        M.addEventListener('click', function (e) {
+            if (e.target === M) return close();
+            var b = e.target.closest('[data-dsn]'); if (b) { e.preventDefault(); act(b.getAttribute('data-dsn')); return; }
+            var c = e.target.closest('[data-choice]'); if (c) setChoice(c.getAttribute('data-choice'));
+        });
+        $('dsn-msg').addEventListener('input', function () { cur.edited = true; });
+        $('dsn-detail').addEventListener('change', function () { if (!cur.edited || confirm('Remplacer votre message par le modèle mis à jour ?')) refillMsg(); });
+        $('dsn-tel').addEventListener('input', hints); $('dsn-email').addEventListener('input', hints);
+        document.addEventListener('keydown', function (e) { if (e.key === 'Escape' && M.classList.contains('open')) { e.stopPropagation(); close(); } }, true);
+        return M;
+    }
+    function close() { if (M) M.classList.remove('open'); }
+    function hints() {
+        var em = $('dsn-email').value.trim(), eh = $('dsn-email-h');
+        eh.className = 'dsn-hint' + (em ? (/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(em) ? ' ok' : ' bad') : '');
+        eh.textContent = em ? (/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(em) ? '✓ Adresse valide' : '⚠️ Adresse incomplète') : 'Facultatif : vous pourrez choisir le destinataire dans la messagerie';
+        var n = waNumber($('dsn-tel').value), th = $('dsn-tel-h');
+        th.className = 'dsn-hint' + (n ? (n.length >= 9 ? ' ok' : ' bad') : '');
+        th.textContent = n ? (n.length >= 9 ? '→ envoyé au ' + waPretty(n) : '⚠️ Numéro trop court') : 'Vide : WhatsApp vous laissera choisir le contact';
+    }
+    function refillMsg() { var d = getD(cur.id); if (!d) return; $('dsn-msg').value = message(d, cur.choice, $('dsn-detail').checked); cur.edited = false; }
+    function setChoice(ch) {
+        var d = getD(cur.id); if (!d) return;
+        if ((ch === 'bl' || ch === 'both') && !blReady(d)) ch = 'doc';
+        var changed = ch !== cur.choice; cur.choice = ch;
+        Array.prototype.forEach.call(M.querySelectorAll('[data-choice]'), function (b) { b.classList.toggle('on', b.getAttribute('data-choice') === ch); });
+        if (changed || !$('dsn-msg').value) { if (!cur.edited || confirm('Remplacer votre message par le modèle du document choisi ?')) refillMsg(); }
+        prepare();
+    }
+    // Prépare le(s) PDF en arrière-plan : le partage reste ainsi immédiat au clic
+    function prepare() {
+        var gen = ++cur.gen, id = cur.id, ch = cur.choice;
+        cur.files = null;
+        var box = $('dsn-pdf'), sh = $('dsn-share'), dl = $('dsn-dl');
+        box.className = 'dsn-pdf'; box.textContent = '⏳ Préparation du PDF…';
+        sh.disabled = dl.disabled = true;
+        cur.pending = buildFiles(id, ch).then(function (files) {
+            if (gen !== cur.gen) return files;
+            cur.files = files; sh.disabled = dl.disabled = false;
+            var kb = files.reduce(function (s, f) { return s + f.size; }, 0) / 1024;
+            box.innerHTML = '📄 PDF prêt : <b>' + files.map(function (f) { return esc(f.name); }).join('</b> + <b>') + '</b> (' + Math.max(1, Math.round(kb)) + ' Ko)'
+                + (canShareFiles() ? '' : '<br>Sur ordinateur, WhatsApp et la messagerie ne peuvent pas joindre un fichier eux-mêmes : le PDF est téléchargé, glissez-le dans la conversation ou le mail.');
+            return files;
+        }, function (e) {
+            if (gen !== cur.gen) return null;
+            box.className = 'dsn-pdf err';
+            box.textContent = '⚠️ PDF indisponible (' + (e && e.message || 'erreur') + '). Le message peut quand même être envoyé ; pour joindre le document, utilisez 🖨️ puis « Enregistrer au format PDF ».';
+            dl.disabled = true; sh.disabled = true;
+            return null;
+        });
+    }
+    function histHTML(d) {
+        var h = Array.isArray(d.envois) ? d.envois.slice(-6).reverse() : [];
+        if (!h.length) return '';
+        var C = { whatsapp: '🟢 WhatsApp', email: '✉️ E-mail', gmail: '📧 Gmail', partage: '📎 Partage', pdf: '⬇️ PDF' };
+        return '<div style="font-weight:900;margin-bottom:3px;">📜 Envois précédents</div>' + h.map(function (x) {
+            var dt = new Date(x.date);
+            return '<div><span><b>' + (C[x.canal] || esc(x.canal)) + '</b>' + (x.dest ? ' · ' + esc(x.dest) : '') + ' · ' + esc((x.docs || []).join(' + ')) + '</span><span>' + dt.toLocaleDateString('fr-FR', { day: '2-digit', month: 'short' }) + ' ' + dt.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }) + '</span></div>';
+        }).join('');
+    }
+    window._devisOpenSend = function (id) {
+        var d = getD(id); if (!d) { toast('Document introuvable'); return; }
+        build();
+        cur.id = id; cur.choice = null; cur.edited = false;
+        var fact = isFact(d), bl = blReady(d);
+        $('dsn-title').textContent = 'Envoyer ' + (fact ? 'la facture ' : 'le devis ') + d.numero;
+        $('dsn-sub').textContent = ((d.client && d.client.nom) || 'Client non renseigné') + ' · ' + eur(d.totalTTC);
+        $('dsn-docs').innerHTML = '<button type="button" data-choice="doc">' + (fact ? '🧾 Facture complète' : '📄 Devis') + '</button>'
+            + (bl ? '<button type="button" data-choice="bl">🚚 Bon de livraison</button><button type="button" data-choice="both">🧾 + 🚚 Les deux</button>' : '');
+        $('dsn-email').value = (d.client && d.client.email) || '';
+        $('dsn-tel').value = (d.client && d.client.tel) || '';
+        $('dsn-detail').checked = false;
+        var share = canShareFiles();
+        $('dsn-share').style.display = share ? '' : 'none';
+        $('dsn-dl').style.gridColumn = share ? '' : '1 / -1';
+        $('dsn-auto-dl').checked = !share;
+        $('dsn-hist').innerHTML = histHTML(d);
+        hints();
+        M.classList.add('open');
+        setChoice('doc');
+        setTimeout(function () { var e = $(d.client && d.client.tel ? 'dsn-msg' : 'dsn-tel'); if (e) { e.focus(); if (e.id === 'dsn-msg') { try { e.setSelectionRange(0, 0); } catch (x) {} e.scrollTop = 0; } } }, 60);
+    };
+
+    /* ───────────── Envoi ───────────── */
+    function docsLabel() { var d = getD(cur.id); var f = isFact(d) ? 'facture' : 'devis'; return cur.choice === 'both' ? [f, 'bon de livraison'] : cur.choice === 'bl' ? ['bon de livraison'] : [f]; }
+    function logSend(canal, dest) {
+        var list = _devisGetAll(), i = list.findIndex(function (x) { return x.id === cur.id; }); if (i < 0) return;
+        var d = list[i];
+        d.client = d.client || {};
+        var em = $('dsn-email').value.trim(), tel = $('dsn-tel').value.trim();
+        if (em && em !== d.client.email) d.client.email = em;
+        if (tel && tel !== d.client.tel) d.client.tel = tel;
+        if (!Array.isArray(d.envois)) d.envois = [];
+        d.envois.push({ date: new Date().toISOString(), canal: canal, dest: dest || '', docs: docsLabel() });
+        if (d.envois.length > 50) d.envois = d.envois.slice(-50);
+        var promoted = false;
+        if ((!d.statut || d.statut === 'brouillon') && canal !== 'pdf') { d.statut = 'envoye'; promoted = true; }
+        list[i] = d; _devisSaveAll(list);
+        $('dsn-hist').innerHTML = histHTML(d);
+        try { if (typeof _devisRenderList === 'function') _devisRenderList(); } catch (e) {}
+        try { var pv = $('devis-preview-modal'); if (pv && pv.style.display !== 'none' && pv.style.display !== '') window._devisOpenPreview(cur.id); } catch (e) {}
+        if (promoted) toast('📤 Devis ' + d.numero + ' marqué « Envoyé »', 'success');
+    }
+    function withFiles(fn) {
+        if (cur.files) return fn(cur.files);
+        if (cur.pending) cur.pending.then(function (f) { if (f) fn(f); });
+    }
+    function act(a) {
+        var d = getD(cur.id); if (!d) return;
+        var msg = $('dsn-msg').value.trim(), sub = subject(d, cur.choice), em = $('dsn-email').value.trim(), autoDl = $('dsn-auto-dl').checked;
+        if (a === 'close') return close();
+        if (!msg && a !== 'dl') { toast('Le message est vide', 'info'); $('dsn-msg').focus(); return; }
+        if (a === 'wa') {
+            var n = waNumber($('dsn-tel').value);
+            if (n && n.length < 9) { toast('⚠️ Numéro WhatsApp incomplet', 'info'); $('dsn-tel').focus(); return; }
+            window.open('https://wa.me/' + (n || '') + '?text=' + encodeURIComponent(msg), '_blank', 'noopener');
+            if (autoDl) withFiles(download);
+            logSend('whatsapp', n ? waPretty(n) : '');
+            toast('🟢 WhatsApp ouvert' + (autoDl ? ' — PDF téléchargé : joignez-le à la conversation' : ''), 'success');
+        } else if (a === 'mail' || a === 'gmail') {
+            if (em && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(em)) { toast('⚠️ Adresse e-mail incomplète', 'info'); $('dsn-email').focus(); return; }
+            if (a === 'mail') {
+                var l = document.createElement('a');
+                l.href = 'mailto:' + encodeURIComponent(em).replace(/%40/g, '@') + '?subject=' + encodeURIComponent(sub) + '&body=' + encodeURIComponent(msg);
+                document.body.appendChild(l); l.click(); l.remove();
+            } else {
+                window.open('https://mail.google.com/mail/?view=cm&fs=1' + (em ? '&to=' + encodeURIComponent(em) : '') + '&su=' + encodeURIComponent(sub) + '&body=' + encodeURIComponent(msg), '_blank', 'noopener');
+            }
+            if (autoDl) withFiles(download);
+            logSend(a === 'mail' ? 'email' : 'gmail', em);
+            toast((a === 'mail' ? '✉️ Messagerie ouverte' : '📧 Gmail ouvert') + (autoDl ? ' — PDF téléchargé : ajoutez-le en pièce jointe' : ''), 'success');
+        } else if (a === 'share') {
+            if (!cur.files) { toast('⏳ PDF en préparation, un instant…', 'info'); return; }
+            var data = { files: cur.files, title: sub, text: msg };
+            navigator.share(data).then(function () { logSend('partage', ''); toast('📎 Document partagé', 'success'); }, function (e) { if (e && e.name !== 'AbortError') toast('Partage impossible : ' + (e.message || e.name), 'info'); });
+        } else if (a === 'dl') {
+            if (!cur.files) { toast('⏳ PDF en préparation, un instant…', 'info'); return; }
+            download(cur.files); logSend('pdf', '');
+        }
+    }
+
+    /* ───────────── Boutons : liste + aperçu ───────────── */
+    function decorateList() {
+        Array.prototype.forEach.call(document.querySelectorAll('.devis-row'), function (row) {
+            if (row.querySelector('.dsn-btn')) return;
+            var m = /_devisOpenPreview\('([^']+)'\)/.exec(row.getAttribute('onclick') || ''); if (!m) return;
+            var ref = row.querySelector('button[onclick^="_devisDuplicate"]'); if (!ref) return;
+            var d = getD(m[1]), n = d && Array.isArray(d.envois) ? d.envois.length : 0;
+            var b = document.createElement('button');
+            b.type = 'button'; b.className = 'devis-icon-btn dsn-btn'; b.textContent = '📤';
+            b.title = 'Envoyer par e-mail ou WhatsApp' + (n ? ' — déjà envoyé ' + n + ' fois' : '');
+            b.onclick = function (e) { e.stopPropagation(); window._devisOpenSend(m[1]); };
+            ref.parentNode.insertBefore(b, ref);
+        });
+    }
+    var prevList = window._devisRenderList;
+    if (typeof prevList === 'function') window._devisRenderList = function () { var r = prevList.apply(this, arguments); try { decorateList(); } catch (e) {} return r; };
+    var prevPv = window._devisOpenPreview;
+    if (typeof prevPv === 'function') window._devisOpenPreview = function (id) {
+        var r = prevPv.apply(this, arguments);
+        try {
+            var ref = $('devis-preview-btn-pdf');
+            var btn = $('devis-preview-btn-send');
+            if (!btn && ref) {
+                btn = document.createElement('button');
+                btn.id = 'devis-preview-btn-send'; btn.type = 'button';
+                btn.style.cssText = 'padding:9px 16px;background:linear-gradient(135deg,#0f766e,#115e59);color:#fff;border:none;border-radius:9px;cursor:pointer;font-size:0.83rem;font-weight:800;';
+                btn.textContent = '📤 Envoyer';
+                btn.title = 'Envoyer par e-mail ou WhatsApp';
+                ref.parentNode.insertBefore(btn, ref);
+            }
+            if (btn) btn.onclick = function () { window._devisOpenSend(id); };
+            var d = getD(id), body = $('devis-preview-body');
+            if (body && d && Array.isArray(d.envois) && d.envois.length && !body.querySelector('.dsn-pv')) {
+                var C = { whatsapp: '🟢 WhatsApp', email: '✉️ E-mail', gmail: '📧 Gmail', partage: '📎 Partage', pdf: '⬇️ PDF téléchargé' };
+                body.insertAdjacentHTML('beforeend', '<div class="dsn-pv"><div class="t">📤 Envois (' + d.envois.length + ')</div>' + d.envois.slice(-3).reverse().map(function (x) {
+                    var dt = new Date(x.date);
+                    return '<div class="r"><span>' + (C[x.canal] || esc(x.canal)) + (x.dest ? ' · ' + esc(x.dest) : '') + '</span><span>' + dt.toLocaleDateString('fr-FR', { day: '2-digit', month: 'short', year: 'numeric' }) + '</span></div>';
+                }).join('') + '</div>');
+            }
+        } catch (e) {}
+        return r;
+    };
+    // Copie d'un devis : l'historique d'envoi n'est pas repris
+    var prevDup = window._devisDuplicate;
+    if (typeof prevDup === 'function') window._devisDuplicate = function () {
+        var before = {}; _devisGetAll().forEach(function (x) { before[x.id] = 1; });
+        var r = prevDup.apply(this, arguments);
+        try { var l = _devisGetAll(), ch = false; l.forEach(function (x) { if (!before[x.id] && x.envois) { delete x.envois; ch = true; } }); if (ch) { _devisSaveAll(l); if (typeof _devisRenderList === 'function') _devisRenderList(); } } catch (e) {}
+        return r;
+    };
+    setTimeout(function () { try { decorateList(); } catch (e) {} }, 800);
+})();
+</script>
+<script>
+/* ════════════════════════════════════════════════════════════════════════
+   GESTION PRO — SUIVI SIMPLIFIÉ DES FACTURES (vue « ✅ Factures »)
+   Une carte claire par facture :
+   • montant, barre « réglé / reste à payer », état du règlement
+   • gros boutons : 💶 Encaisser · 🖨️ Facture · 🚚 Bon de livraison · 📤 Envoyer · 💬 Note
+   • panneau dépliable (clic sur la carte) :
+       – 💬 Note de suivi rapide, enregistrée automatiquement, avec raccourcis
+         (« reste à payer », « reste à livrer », « règlement prévu le… »…)
+       – 🚚 Livraison article par article : livré / reste à livrer (− +, « Tout livré ») ;
+         le bon de livraison imprime alors les quantités réellement livrées
+       – 💶 Règlements déjà reçus
+   • indicateurs : facturé, encaissé, reste à encaisser, reste à livrer ; filtre « reste à livrer »
+   Données : d.suivi = { text, at } · d.livraison = { q: { clé ligne: qté livrée }, at }
+   ════════════════════════════════════════════════════════════════════════ */
+(function () {
+    'use strict';
+    if (window._fctInstalled) return;
+    window._fctInstalled = true;
+
+    function $(id) { return document.getElementById(id); }
+    function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
+    function eur(n) { return _devisFmtEUR(n); }
+    function toast(m, t) { if (typeof showScanToast === 'function') showScanToast(m, t || 'info'); }
+    function num(v) { var n = parseFloat(String(v == null ? '' : v).replace(',', '.')); return isFinite(n) ? n : 0; }
+    function r3(v) { return Math.round((+v || 0) * 1000) / 1000; }
+    function getD(id) { return _devisGetAll().find(function (x) { return x.id === id; }) || null; }
+    function isFactView() { try { return _devisViewMode === 'facture'; } catch (e) { return false; } }
+    function regle(d) { return _devisMontantRegle(d); }
+    function reste(d) { return _devisResteAPayer(d); }
+    function payState(d) { var rg = regle(d); if (rg <= 0.004) return 'none'; return reste(d) <= 0.004 ? 'paid' : 'part'; }
+    function update(id, fn) {
+        var list = _devisGetAll(), i = list.findIndex(function (x) { return x.id === id; }); if (i < 0) return null;
+        fn(list[i]); _devisSaveAll(list); return list[i];
+    }
+    function today() { var t = new Date(); return String(t.getDate()).padStart(2, '0') + '/' + String(t.getMonth() + 1).padStart(2, '0'); }
+
+    /* ───────────── Livraison : quantités livrées par ligne ───────────── */
+    function lineKey(d, l) { var i = (d.items || []).indexOf(l); return l.id ? String(l.id) : 'i' + i; }
+    function livInfo(d) {
+        var q = (d.livraison && d.livraison.q) || null;
+        var lines = (d.items || []).filter(function (l) { return (l.nom || '').trim() || num(l.quantite) > 0; }).map(function (l) {
+            var k = lineKey(d, l), cmd = num(l.quantite), lv = q && q[k] != null ? Math.min(cmd, Math.max(0, num(q[k]))) : null;
+            return { k: k, nom: l.nom || '', cmd: cmd, livre: lv, reste: lv == null ? null : r3(cmd - lv) };
+        });
+        var tracked = !!q;
+        var tc = lines.reduce(function (s, x) { return s + x.cmd; }, 0), tl = lines.reduce(function (s, x) { return s + (x.livre || 0); }, 0);
+        return { tracked: tracked, lines: lines, cmd: r3(tc), livre: r3(tl), reste: tracked ? r3(tc - tl) : null };
+    }
+    // Utilisé par le bon de livraison : quantité réellement livrée (null = pas de suivi → quantité commandée)
+    window._devisLivreQty = function (d, l) {
+        if (!d || !d.livraison || !d.livraison.q) return null;
+        var k = lineKey(d, l), v = d.livraison.q[k];
+        return v == null ? null : Math.min(num(l.quantite), Math.max(0, num(v)));
+    };
+    function livChip(d) {
+        var L = livInfo(d);
+        if (!L.tracked) return '<span class="fct-chip mute" data-act="open-liv" title="Indiquer ce qui a été livré">🚚 Livraison à renseigner</span>';
+        if (L.reste <= 0.0005) return '<span class="fct-chip ok" data-act="open-liv">✅ Livrée' + (d.blNumero ? ' · ' + esc(d.blNumero) : '') + '</span>';
+        if (L.livre <= 0.0005) return '<span class="fct-chip warn" data-act="open-liv">📦 Rien de livré · ' + fmtQ(L.reste) + ' à livrer</span>';
+        return '<span class="fct-chip warn" data-act="open-liv">📦 Reste à livrer : ' + fmtQ(L.reste) + ' / ' + fmtQ(L.cmd) + '</span>';
+    }
+    function fmtQ(q) { return (+r3(q)).toLocaleString('fr-FR') + ' art.'; }
+
+    /* ───────────── Styles ───────────── */
+    var css = document.createElement('style');
+    css.id = 'fct-css';
+    css.textContent = [
+        '.fct-card{background:var(--bg-card,#fff);border:1.5px solid var(--border-color,#e5e7eb);border-radius:14px;overflow:hidden;border-left:6px solid #a52714;transition:box-shadow .15s;}',
+        '.fct-card.part{border-left-color:#e6a100;}.fct-card.paid{border-left-color:#1b7a43;}',
+        '.fct-card:hover{box-shadow:0 6px 20px rgba(0,0,0,.07);}',
+        '.fct-card.open{box-shadow:0 10px 28px rgba(0,0,0,.12);}',
+        '.fct-top{display:flex;gap:14px;align-items:flex-start;padding:12px 14px 6px;cursor:pointer;}',
+        '.fct-id{flex:1;min-width:0;}',
+        '.fct-id .n{font-size:.78rem;font-weight:800;color:#1b7a43;}',
+        '.fct-id .c{display:block;font-size:1rem;font-weight:900;color:var(--text-main,#1e2d3d);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}',
+        '.fct-id small{display:block;font-size:.72rem;color:var(--text-muted,#888);margin-top:1px;}',
+        '.fct-amt{text-align:right;white-space:nowrap;}',
+        '.fct-amt b{display:block;font-size:1.15rem;font-weight:900;color:var(--text-main,#1e2d3d);}',
+        '.fct-st{display:inline-block;margin-top:3px;font-size:.68rem;font-weight:800;padding:2px 9px;border-radius:10px;}',
+        '.fct-st.none{background:#fdecea;color:#a52714;}.fct-st.part{background:#fff8e1;color:#8a6d00;}.fct-st.paid{background:#e8f5e9;color:#1b5e20;}',
+        '.fct-pay{padding:2px 14px 8px;}',
+        '.fct-bar{height:8px;border-radius:5px;background:rgba(165,39,20,.13);overflow:hidden;}',
+        '.fct-bar i{display:block;height:100%;border-radius:5px;background:linear-gradient(90deg,#27ae60,#1b7a43);}',
+        '.fct-ptx{display:flex;justify-content:space-between;gap:8px;font-size:.76rem;font-weight:700;color:var(--text-muted,#666);margin-top:4px;flex-wrap:wrap;}',
+        '.fct-ptx .rest{color:#c0392b;font-weight:900;}.fct-ptx .done{color:#1b7a43;font-weight:900;}',
+        '.fct-chips{display:flex;gap:6px;flex-wrap:wrap;padding:0 14px 8px;}',
+        '.fct-chip{font-size:.72rem;font-weight:800;padding:4px 10px;border-radius:12px;background:var(--bg-body,#f4f7f6);color:var(--text-main,#1e2d3d);cursor:pointer;max-width:100%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;border:1px solid transparent;}',
+        '.fct-chip.ok{background:#e8f5e9;color:#1b5e20;}.fct-chip.warn{background:#fff3e0;color:#9a5300;}.fct-chip.mute{color:var(--text-muted,#888);border:1px dashed var(--border-color,#ddd);background:transparent;}',
+        '.fct-chip.note{background:#eef4ff;color:#1d4ed8;max-width:min(520px,100%);}',
+        'body.dark-mode .fct-chip.ok{background:rgba(34,197,94,.15);color:#86efac;}body.dark-mode .fct-chip.warn{background:rgba(245,158,11,.15);color:#fbbf24;}body.dark-mode .fct-chip.note{background:rgba(59,130,246,.15);color:#93c5fd;}',
+        'body.dark-mode .fct-st.none{background:rgba(239,68,68,.15);color:#fca5a5;}body.dark-mode .fct-st.part{background:rgba(245,158,11,.15);color:#fbbf24;}body.dark-mode .fct-st.paid{background:rgba(34,197,94,.15);color:#86efac;}',
+        '.fct-acts{display:flex;gap:6px;flex-wrap:wrap;padding:8px 14px 12px;border-top:1px solid var(--border-color,#f0f0f0);}',
+        '.fct-acts button{border:1.5px solid var(--border-color,#e5e7eb);background:var(--bg-card,#fff);color:var(--text-main,#1e2d3d);border-radius:10px;padding:8px 12px;font-weight:800;font-size:.8rem;cursor:pointer;font-family:inherit;display:inline-flex;align-items:center;gap:5px;}',
+        '.fct-acts button:hover{border-color:#1b7a43;}',
+        '.fct-acts .pay{background:linear-gradient(135deg,#27ae60,#1e8449);color:#fff;border:none;}',
+        '.fct-acts .paid{background:#e8f5e9;color:#1b5e20;border-color:#a5d6a7;cursor:default;}',
+        'body.dark-mode .fct-acts .paid{background:rgba(34,197,94,.12);color:#86efac;border-color:rgba(34,197,94,.3);}',
+        '.fct-acts .more{margin-left:auto;}',
+        '.fct-panel{display:none;border-top:1.5px dashed var(--border-color,#e5e7eb);background:var(--bg-body,#f8fafc);padding:12px 14px 14px;grid-template-columns:1.1fr 1fr;gap:14px;}',
+        '.fct-card.open .fct-panel{display:grid;}',
+        '.fct-box{background:var(--bg-card,#fff);border:1px solid var(--border-color,#e5e7eb);border-radius:12px;padding:11px 12px;display:flex;flex-direction:column;gap:8px;min-width:0;}',
+        '.fct-box h4{margin:0;font-size:.8rem;font-weight:900;display:flex;align-items:center;gap:6px;color:var(--text-main,#1e2d3d);}',
+        '.fct-box h4 small{margin-left:auto;font-weight:700;color:var(--text-muted,#888);font-size:.68rem;}',
+        '.fct-box textarea{width:100%;box-sizing:border-box;min-height:92px;resize:vertical;padding:9px 11px;border:1.5px solid var(--border-color,#ddd);border-radius:10px;font-family:inherit;font-size:.84rem;line-height:1.45;background:var(--input-bg,var(--bg-card,#fff));color:var(--text-main,#1e2d3d);}',
+        '.fct-box textarea:focus,.fct-lv input:focus{outline:none;border-color:#1b7a43;box-shadow:0 0 0 3px rgba(27,122,67,.12);}',
+        '.fct-quick{display:flex;gap:5px;flex-wrap:wrap;}',
+        '.fct-quick button{border:1px solid var(--border-color,#ddd);background:var(--bg-body,#f4f7f6);color:var(--text-main,#1e2d3d);border-radius:12px;padding:4px 9px;font-size:.7rem;font-weight:700;cursor:pointer;font-family:inherit;}',
+        '.fct-quick button:hover{border-color:#1b7a43;color:#1b7a43;}',
+        '.fct-saved{font-size:.68rem;font-weight:700;color:var(--text-muted,#888);min-height:14px;}',
+        '.fct-saved.ok{color:#1b7a43;}',
+        '.fct-lv{display:grid;grid-template-columns:1fr auto auto;gap:6px 10px;align-items:center;font-size:.78rem;}',
+        '.fct-lv .h{font-size:.64rem;font-weight:800;text-transform:uppercase;letter-spacing:.3px;color:var(--text-muted,#888);}',
+        '.fct-lv .nm{font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}',
+        '.fct-lv .nm small{display:block;font-weight:600;color:var(--text-muted,#888);font-size:.68rem;}',
+        '.fct-step{display:flex;align-items:center;border:1.5px solid var(--border-color,#ddd);border-radius:9px;overflow:hidden;}',
+        '.fct-step button{border:none;background:var(--bg-body,#f4f7f6);color:var(--text-main,#1e2d3d);width:28px;height:30px;font-weight:900;cursor:pointer;font-size:.95rem;}',
+        '.fct-step input{width:52px;height:30px;border:none;text-align:center;font-weight:800;font-size:.84rem;background:var(--bg-card,#fff);color:var(--text-main,#1e2d3d);-moz-appearance:textfield;}',
+        '.fct-step input::-webkit-inner-spin-button{-webkit-appearance:none;margin:0;}',
+        '.fct-lv .rs{font-weight:800;min-width:72px;text-align:right;white-space:nowrap;}',
+        '.fct-lv .rs.ok{color:#1b7a43;}.fct-lv .rs.wait{color:#c2410c;}',
+        '.fct-lvbtns{display:flex;gap:6px;flex-wrap:wrap;}',
+        '.fct-lvbtns button{border:1.5px solid #1b7a43;background:transparent;color:#1b7a43;border-radius:9px;padding:6px 10px;font-weight:800;font-size:.74rem;cursor:pointer;font-family:inherit;}',
+        '.fct-lvbtns button.solid{background:#1b7a43;color:#fff;}',
+        '.fct-plist{font-size:.76rem;display:flex;flex-direction:column;gap:3px;}',
+        '.fct-plist div{display:flex;justify-content:space-between;gap:8px;color:var(--text-muted,#666);font-weight:600;}',
+        '.fct-plist b{color:var(--text-main,#1e2d3d);}',
+        '.fct-right{display:flex;flex-direction:column;gap:14px;min-width:0;}',
+        '@media (max-width:760px){.fct-panel{grid-template-columns:1fr;}.fct-acts .more{margin-left:0;}.fct-acts button{flex:1 1 auto;justify-content:center;}}'
+    ].join('\n');
+    document.head.appendChild(css);
+
+    /* ───────────── Rendu de la vue « Factures » ───────────── */
+    var openIds = {};
+    function filtered() {
+        var q = (($('devis-search') || {}).value || '').trim().toLowerCase(), f = ($('devis-filter-statut') || {}).value || '';
+        var list = _devisGetAll().filter(function (d) { return _devisIsFacture(d); }).sort(function (a, b) { return (b.createdAt || '').localeCompare(a.createdAt || ''); });
+        if (q) list = list.filter(function (d) { return (d.numero || '').toLowerCase().indexOf(q) >= 0 || ((d.client && d.client.nom) || '').toLowerCase().indexOf(q) >= 0 || ((d.suivi && d.suivi.text) || '').toLowerCase().indexOf(q) >= 0; });
+        if (f === 'alivrer') list = list.filter(function (d) { var L = livInfo(d); return L.tracked && L.reste > 0.0005; });
+        else if (f === 'note') list = list.filter(function (d) { return d.suivi && (d.suivi.text || '').trim(); });
+        else if (f) list = list.filter(function (d) { return _devisPaymentBucket(d) === f; });
+        return list;
+    }
+    function stats() {
+        var row = $('devis-stats-row'); if (!row) return;
+        var all = _devisGetAll().filter(function (d) { return _devisIsFacture(d); });
+        var tot = 0, enc = 0, rst = 0, nR = 0, nL = 0, artL = 0;
+        all.forEach(function (d) { tot += num(d.totalTTC); enc += regle(d); var r = reste(d); if (r > 0.004) { rst += r; nR++; } var L = livInfo(d); if (L.tracked && L.reste > 0.0005) { nL++; artL += L.reste; } });
+        row.innerHTML = _devisStatCard('🧾', eur(tot), all.length + ' facture' + (all.length > 1 ? 's' : '') + ' · facturé', '#1a73e8')
+            + _devisStatCard('💚', eur(enc), 'Encaissé', '#1b7a43')
+            + _devisStatCard('⏳', eur(rst), nR + ' facture' + (nR > 1 ? 's' : '') + ' à encaisser', '#c0392b')
+            + _devisStatCard('📦', nL ? fmtQ(artL) : '—', nL ? nL + ' facture' + (nL > 1 ? 's' : '') + ' à finir de livrer' : 'Rien en attente de livraison', '#e67e22');
+    }
+    function card(d) {
+        var ps = payState(d), total = num(d.totalTTC), rg = regle(d), rs = reste(d), pct = total > 0 ? Math.min(100, Math.round(rg / total * 100)) : 0;
+        var days = Math.floor((new Date() - new Date((d.dateEmission || '') + 'T00:00:00')) / 864e5);
+        var stLbl = ps === 'paid' ? '✅ Réglée' : ps === 'part' ? '🟡 Partiellement réglée' : '⏳ Non réglée';
+        var lastPay = (d.paiements || []).map(function (p) { return p.date || ''; }).sort().pop();
+        var note = d.suivi && (d.suivi.text || '').trim();
+        var noteLine = note ? note.split('\n').filter(Boolean).pop() : '';
+        var nEnv = Array.isArray(d.envois) ? d.envois.length : 0;
+        var id = esc(d.id);
+        return '<div class="fct-card ' + ps + (openIds[d.id] ? ' open' : '') + '" data-id="' + id + '">'
+            + '<div class="fct-top" data-act="toggle" role="button" tabindex="0" aria-expanded="' + (openIds[d.id] ? 'true' : 'false') + '" title="Afficher / masquer le suivi (note, livraison, règlements)">'
+            + '<div class="fct-id"><span class="n">Facture ' + esc(d.numero) + '</span><span class="c">' + esc((d.client && d.client.nom) || 'Client non renseigné') + '</span>'
+            + '<small>Émise le ' + _devisFmtDateFR(d.dateEmission) + (ps !== 'paid' && days > 0 ? ' · il y a ' + days + ' jour' + (days > 1 ? 's' : '') : '') + (nEnv ? ' · 📤 envoyée' : '') + '</small></div>'
+            + '<div class="fct-amt"><b>' + eur(total) + '</b><span class="fct-st ' + ps + '">' + stLbl + '</span></div></div>'
+            + '<div class="fct-pay"><div class="fct-bar" title="' + pct + ' % réglé"><i style="width:' + pct + '%"></i></div>'
+            + '<div class="fct-ptx"><span>Réglé : <b>' + eur(rg) + '</b> (' + pct + ' %)</span>'
+            + (ps === 'paid' ? '<span class="done">Soldée' + (lastPay ? ' le ' + _devisFmtDateFR(lastPay.slice(0, 10)) : '') + '</span>' : '<span class="rest">Reste à payer : ' + eur(rs) + '</span>') + '</div></div>'
+            + '<div class="fct-chips">' + livChip(d)
+            + (noteLine ? '<span class="fct-chip note" data-act="open-note" title="' + esc(note) + '">💬 ' + esc(noteLine) + '</span>' : '<span class="fct-chip mute" data-act="open-note">💬 Ajouter une note</span>') + '</div>'
+            + '<div class="fct-acts">'
+            + (ps === 'paid' ? '<button type="button" class="paid" disabled>✅ Réglée</button>' : '<button type="button" class="pay" data-act="pay">💶 Encaisser ' + eur(rs) + '</button>')
+            + '<button type="button" data-act="print" title="Imprimer ou enregistrer la facture complète en PDF">🖨️ Facture</button>'
+            + '<button type="button" data-act="bl" title="Imprimer le bon de livraison' + (d.blNumero ? ' ' + esc(d.blNumero) : '') + '">🚚 Bon de livraison</button>'
+            + (typeof window._devisOpenSend === 'function' ? '<button type="button" data-act="send" title="Envoyer par e-mail ou WhatsApp">📤 Envoyer</button>' : '')
+            + '<button type="button" data-act="toggle" class="more" title="Note de suivi, livraison, règlements">' + (openIds[d.id] ? '▲ Masquer' : '▼ Suivi') + '</button>'
+            + '<button type="button" data-act="preview" title="Aperçu complet (modifier, dupliquer…)">👁️</button>'
+            + '</div>'
+            + '<div class="fct-panel">' + (openIds[d.id] ? panel(d) : '') + '</div>'
+            + '</div>';
+    }
+    function panel(d) {
+        var rs = reste(d), L = livInfo(d), note = (d.suivi && d.suivi.text) || '';
+        var quick = [];
+        if (rs > 0.004) quick.push(['💶 Reste à payer', '💶 Reste à payer : ' + eur(rs)]);
+        if (L.tracked && L.reste > 0.0005) quick.push(['📦 Reste à livrer', '📦 Reste à livrer : ' + L.lines.filter(function (x) { return x.reste > 0.0005; }).map(function (x) { return (+x.reste) + ' × ' + x.nom; }).join(', ')]);
+        quick.push(['📅 Règlement prévu le…', '📅 Règlement prévu le ']);
+        quick.push(['🚚 Livraison prévue le…', '🚚 Livraison prévue le ']);
+        quick.push(['🤝 Paiement en plusieurs fois', '🤝 Paiement en plusieurs fois accordé']);
+        quick.push(['📞 Client relancé', '📞 Client relancé']);
+        var h = '<div class="fct-box"><h4>💬 Note de suivi<small>visible uniquement par vous</small></h4>'
+            + '<textarea data-note placeholder="Ex. : reste 150 € à payer fin du mois · 2 chaises livrées la semaine prochaine…">' + esc(note) + '</textarea>'
+            + '<div class="fct-quick">' + quick.map(function (q) { return '<button type="button" data-quick="' + esc(q[1]) + '">' + esc(q[0]) + '</button>'; }).join('') + '</div>'
+            + '<div class="fct-saved" data-saved>' + (d.suivi && d.suivi.at ? 'Enregistrée le ' + new Date(d.suivi.at).toLocaleString('fr-FR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }) : 'Enregistrement automatique') + '</div></div>';
+        // Livraison
+        h += '<div class="fct-right"><div class="fct-box" data-liv><h4>🚚 Livraison<small>' + (L.tracked ? (L.reste > 0.0005 ? fmtQ(L.livre) + ' livré(s) sur ' + fmtQ(L.cmd) : 'tout est livré') : 'cochez ce qui a été livré') + '</small></h4>'
+            + '<div class="fct-lv"><span class="h">Article</span><span class="h">Livré</span><span class="h" style="text-align:right;">Reste</span>'
+            + L.lines.map(function (x) {
+                var lv = x.livre == null ? 0 : x.livre, rr = r3(x.cmd - lv);
+                return '<span class="nm" title="' + esc(x.nom) + '">' + esc(x.nom) + '<small>commandé : ' + (+x.cmd) + '</small></span>'
+                    + '<span class="fct-step"><button type="button" data-lv="-1" data-k="' + esc(x.k) + '" aria-label="Moins">−</button><input type="number" min="0" max="' + x.cmd + '" step="any" value="' + (+r3(lv)) + '" data-lvin="' + esc(x.k) + '" aria-label="Quantité livrée ' + esc(x.nom) + '"><button type="button" data-lv="1" data-k="' + esc(x.k) + '" aria-label="Plus">+</button></span>'
+                    + '<span class="rs ' + (rr <= 0.0005 ? 'ok' : 'wait') + '">' + (rr <= 0.0005 ? '✓ livré' : (+rr) + ' à livrer') + '</span>';
+            }).join('') + '</div>'
+            + '<div class="fct-lvbtns"><button type="button" class="solid" data-act="liv-all">✅ Tout livré</button><button type="button" data-act="liv-none">↺ Rien livré</button><button type="button" data-act="bl">🖨️ Bon de livraison</button></div></div>';
+        // Règlements
+        var ps = (d.paiements || []).slice().sort(function (a, b) { return String(a.date || '').localeCompare(String(b.date || '')); });
+        h += '<div class="fct-box"><h4>💶 Règlements<small>' + eur(regle(d)) + ' reçu(s)</small></h4>'
+            + (ps.length ? '<div class="fct-plist">' + ps.map(function (p) { return '<div><span>' + _devisFmtDateFR(String(p.date || '').slice(0, 10)) + ' · ' + esc(typeof _devisPaymentModeLabel === 'function' ? _devisPaymentModeLabel(p.mode) : p.mode) + '</span><b>' + eur(p.montant) + '</b></div>'; }).join('') + '</div>' : '<div style="font-size:.76rem;color:var(--text-muted,#888);">Aucun règlement pour l’instant.</div>')
+            + (rs > 0.004 ? '<div class="fct-lvbtns"><button type="button" class="solid" data-act="pay" style="border-color:#27ae60;background:#27ae60;">💶 Encaisser ' + eur(rs) + '</button></div>' : '')
+            + '</div></div>';
+        return h;
+    }
+    function render() {
+        var body = $('devis-list-body'), empty = $('devis-empty'); if (!body) return;
+        stats();
+        var hint = $('devis-hint-text'); if (hint) hint.textContent = '💡 Une carte par facture : encaissez, imprimez la facture ou le bon de livraison en un clic. Cliquez sur la carte pour la note de suivi et la livraison.';
+        var list = filtered();
+        if (!list.length) { body.innerHTML = ''; if (empty) empty.style.display = 'block'; return; }
+        if (empty) empty.style.display = 'none';
+        body.innerHTML = list.map(card).join('');
+    }
+    function refreshCard(id, keepFocus) {
+        var el = document.querySelector('.fct-card[data-id="' + cssEsc(id) + '"]'), d = getD(id); if (!el || !d) return;
+        var tmp = document.createElement('div'); tmp.innerHTML = card(d); var nw = tmp.firstChild;
+        if (keepFocus) {           // on garde la zone de note telle quelle (saisie en cours)
+            var oldTa = el.querySelector('textarea[data-note]'), newTa = nw.querySelector('textarea[data-note]');
+            if (oldTa && newTa) newTa.parentNode.replaceChild(oldTa, newTa);
+        }
+        el.parentNode.replaceChild(nw, el);
+        stats();
+    }
+    function cssEsc(s) { return (window.CSS && CSS.escape) ? CSS.escape(s) : String(s).replace(/["\\]/g, '\\$&'); }
+
+    var prevList = window._devisRenderList;
+    if (typeof prevList === 'function') window._devisRenderList = function () {
+        var r = prevList.apply(this, arguments);
+        try { if (isFactView()) render(); } catch (e) { console.warn('[factures]', e); }
+        return r;
+    };
+    var prevView = window._devisSetView;
+    if (typeof prevView === 'function') window._devisSetView = function (v) {
+        var sel = $('devis-filter-statut'), keep = sel ? sel.value : '';
+        var r = prevView.apply(this, arguments);
+        try {
+            if (isFactView() && sel && !sel.querySelector('option[value="alivrer"]')) {
+                sel.insertAdjacentHTML('beforeend', '<option value="alivrer">📦 Reste à livrer</option><option value="note">💬 Avec une note</option>');
+                if (keep === 'alivrer' || keep === 'note') { sel.value = keep; }
+                render();
+            }
+        } catch (e) {}
+        return r;
+    };
+
+    /* ───────────── Actions ───────────── */
+    var noteTimer = {};
+    function saveNote(id, ta, box) {
+        clearTimeout(noteTimer[id]);
+        noteTimer[id] = setTimeout(function () {
+            var txt = ta.value.replace(/\s+$/, '');
+            update(id, function (d) { if (txt) d.suivi = { text: txt, at: new Date().toISOString() }; else delete d.suivi; });
+            var sv = box && box.querySelector('[data-saved]'); if (sv) { sv.textContent = '✓ Note enregistrée'; sv.className = 'fct-saved ok'; }
+            // met à jour l'aperçu de la note sur la carte sans perdre la saisie
+            var cardEl = ta.closest('.fct-card'); if (cardEl) {
+                var chip = cardEl.querySelector('[data-act="open-note"]');
+                var last = txt ? txt.split('\n').filter(Boolean).pop() : '';
+                if (chip) { chip.className = 'fct-chip ' + (last ? 'note' : 'mute'); chip.textContent = last ? '💬 ' + last : '💬 Ajouter une note'; chip.title = txt; }
+            }
+        }, 450);
+    }
+    function setLiv(id, fn) {
+        update(id, function (d) {
+            var L = livInfo(d), q = (d.livraison && d.livraison.q) ? Object.assign({}, d.livraison.q) : {};
+            L.lines.forEach(function (x) { if (q[x.k] == null) q[x.k] = 0; });
+            fn(q, L);
+            L.lines.forEach(function (x) { q[x.k] = Math.min(x.cmd, Math.max(0, r3(num(q[x.k])))); });
+            d.livraison = { q: q, at: new Date().toISOString() };
+        });
+        refreshCard(id, true);
+    }
+    document.addEventListener('click', function (e) {
+        var cardEl = e.target.closest && e.target.closest('.fct-card'); if (!cardEl) return;
+        var id = cardEl.getAttribute('data-id');
+        var q = e.target.closest('[data-quick]');
+        if (q) {
+            var ta = cardEl.querySelector('textarea[data-note]'); if (!ta) return;
+            var txt = q.getAttribute('data-quick'), line = '[' + today() + '] ' + txt;
+            ta.value = (ta.value.replace(/\s+$/, '') ? ta.value.replace(/\s+$/, '') + '\n' : '') + line;
+            ta.focus(); var end = ta.value.length; ta.setSelectionRange(end, end); ta.scrollTop = ta.scrollHeight;
+            saveNote(id, ta, ta.closest('.fct-box'));
+            return;
+        }
+        var lv = e.target.closest('[data-lv]');
+        if (lv) { var k = lv.getAttribute('data-k'), dlt = +lv.getAttribute('data-lv'); setLiv(id, function (qq) { qq[k] = num(qq[k]) + dlt; }); return; }
+        var b = e.target.closest('[data-act]'); if (!b || b.disabled) return;
+        var a = b.getAttribute('data-act');
+        if (a === 'toggle' || a === 'open-note' || a === 'open-liv') {
+            if (a === 'toggle' && e.target.closest('textarea,input')) return;
+            var willOpen = a === 'toggle' ? !openIds[id] : true;
+            if (willOpen) openIds[id] = 1; else delete openIds[id];
+            refreshCard(id);
+            if (willOpen) {
+                var nc = document.querySelector('.fct-card[data-id="' + cssEsc(id) + '"]');
+                var f = a === 'open-liv' ? nc && nc.querySelector('[data-liv]') : nc && nc.querySelector('textarea[data-note]');
+                if (f) { if (f.focus) { f.focus(); if (f.tagName === 'TEXTAREA') { var n = f.value.length; f.setSelectionRange(n, n); } } if (f.scrollIntoView) f.scrollIntoView({ block: 'nearest', behavior: 'smooth' }); }
+            }
+        } else if (a === 'pay') {
+            window._fctPayFrom = id; window._devisOpenPaymentModal(id);
+            // Règlement direct (sans ticket de caisse), montant pré-rempli avec le reste à payer
+            try {
+                var dd = getD(id), m = $('devis-payment-montant');
+                if (typeof window._devisSetPaymentMode === 'function') window._devisSetPaymentMode('direct');
+                if (m && dd) { m.value = reste(dd).toFixed(2); m.dispatchEvent(new Event('input', { bubbles: true })); }
+                if (typeof _devisValidatePaymentForm === 'function') _devisValidatePaymentForm();
+                if (m) { m.focus(); m.select(); }
+            } catch (er) {}
+        }
+        else if (a === 'print') window._devisGeneratePDF(id);
+        else if (a === 'bl') window._devisGenerateBL(id);
+        else if (a === 'send') window._devisOpenSend(id);
+        else if (a === 'preview') window._devisOpenPreview(id);
+        else if (a === 'liv-all') { setLiv(id, function (qq, L) { L.lines.forEach(function (x) { qq[x.k] = x.cmd; }); }); toast('✅ Tout est marqué comme livré', 'success'); }
+        else if (a === 'liv-none') { setLiv(id, function (qq, L) { L.lines.forEach(function (x) { qq[x.k] = 0; }); }); }
+    });
+    document.addEventListener('keydown', function (e) {
+        if ((e.key === 'Enter' || e.key === ' ') && e.target.classList && e.target.classList.contains('fct-top')) { e.preventDefault(); e.target.click(); }
+    });
+    document.addEventListener('input', function (e) {
+        var t = e.target; if (!t.closest) return;
+        var cardEl = t.closest('.fct-card'); if (!cardEl) return;
+        var id = cardEl.getAttribute('data-id');
+        if (t.matches('textarea[data-note]')) { var sv = t.closest('.fct-box').querySelector('[data-saved]'); if (sv) { sv.textContent = '… enregistrement'; sv.className = 'fct-saved'; } saveNote(id, t, t.closest('.fct-box')); }
+    });
+    document.addEventListener('change', function (e) {
+        var t = e.target; if (!t.matches || !t.matches('.fct-card input[data-lvin]')) return;
+        var id = t.closest('.fct-card').getAttribute('data-id'), k = t.getAttribute('data-lvin'), v = num(t.value);
+        setLiv(id, function (qq) { qq[k] = v; });
+    });
+
+    // Encaissement lancé depuis une carte : on revient sur la liste des factures (sans rouvrir l'aperçu)
+    var prevConfirm = window._devisConfirmPayment;
+    if (typeof prevConfirm === 'function') window._devisConfirmPayment = function () {
+        var from = window._fctPayFrom;
+        var r = prevConfirm.apply(this, arguments);
+        if (from) {
+            var pm = $('devis-payment-modal');
+            if (!pm || pm.style.display === 'none') {        // règlement enregistré
+                window._fctPayFrom = null;
+                var pv = $('devis-preview-modal'); if (pv) pv.style.display = 'none';
+                try { if (isFactView()) render(); } catch (e) {}
+            }
+        }
+        return r;
+    };
+    // Fermeture de la fenêtre de règlement sans valider
+    document.addEventListener('click', function (e) { var pm = $('devis-payment-modal'); if (window._fctPayFrom && pm && pm.style.display === 'none') window._fctPayFrom = null; }, true);
+
+    // Copie d'une facture : la note et le suivi de livraison ne sont pas repris
+    var prevDup = window._devisDuplicate;
+    if (typeof prevDup === 'function') window._devisDuplicate = function () {
+        var before = {}; _devisGetAll().forEach(function (x) { before[x.id] = 1; });
+        var r = prevDup.apply(this, arguments);
+        try { var l = _devisGetAll(), ch = false; l.forEach(function (x) { if (!before[x.id] && (x.suivi || x.livraison)) { delete x.suivi; delete x.livraison; ch = true; } }); if (ch) { _devisSaveAll(l); _devisRenderList(); } } catch (e) {}
+        return r;
+    };
+    // Aperçu : note de suivi et livraison affichées
+    var prevPv = window._devisOpenPreview;
+    if (typeof prevPv === 'function') window._devisOpenPreview = function (id) {
+        var r = prevPv.apply(this, arguments);
+        try {
+            var d = getD(id), body = $('devis-preview-body');
+            if (d && body && _devisIsFacture(d) && !body.querySelector('.fct-pvnote')) {
+                var L = livInfo(d), note = d.suivi && (d.suivi.text || '').trim();
+                if (note || L.tracked) body.insertAdjacentHTML('beforeend', '<div class="fct-pvnote" style="margin-top:14px;border:1.5px solid rgba(29,78,216,.25);background:rgba(29,78,216,.05);border-radius:10px;padding:9px 12px;font-size:.78rem;">'
+                    + (L.tracked ? '<div style="font-weight:800;margin-bottom:4px;">🚚 ' + (L.reste > 0.0005 ? 'Reste à livrer : ' + fmtQ(L.reste) + ' sur ' + fmtQ(L.cmd) : 'Tout est livré') + '</div>' : '')
+                    + (note ? '<div style="font-weight:800;margin-bottom:2px;">💬 Note de suivi</div><div style="white-space:pre-wrap;color:var(--text-main);">' + esc(note) + '</div>' : '') + '</div>');
+            }
+        } catch (e) {}
         return r;
     };
 })();
