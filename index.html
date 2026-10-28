@@ -9426,6 +9426,13 @@ window._devisOpenPreview = function(id) {
     }).join('');
 
     let html = '';
+    { const _idt = _devisShopIdentity();
+      html += '<div style="background:var(--bg-body,#f4f7f6);border-radius:10px;padding:12px 14px;margin-bottom:10px;border-left:3px solid #2c6fad;">';
+      html +=   '<div style="font-size:0.68rem;text-transform:uppercase;letter-spacing:0.5px;color:var(--text-muted,#888);font-weight:700;margin-bottom:6px;">🏪 Émetteur (en haut à gauche du document)</div>';
+      html +=   '<div style="font-weight:800;color:var(--text-main);font-size:0.92rem;">' + _idt.name.replace(/</g,'&lt;') + '</div>';
+      _idt.lines.forEach(function (l) { html += '<div style="font-size:0.78rem;color:var(--text-muted,#888);margin-top:2px;">' + String(l).replace(/</g,'&lt;') + '</div>'; });
+      if (!_idt.hasAddress) html += '<div style="font-size:0.74rem;color:#b45309;font-weight:700;margin-top:6px;">⚠️ Adresse non renseignée : complétez-la dans COVO Pro → Admin → « Renseignements — Ticket de caisse » (enseigne, adresse, SIRET, téléphone, e-mail).</div>';
+      html += '</div>'; }
     html += '<div style="background:var(--bg-body,#f4f7f6);border-radius:10px;padding:12px 14px;margin-bottom:16px;">';
     html +=   '<div style="font-size:0.68rem;text-transform:uppercase;letter-spacing:0.5px;color:var(--text-muted,#888);font-weight:700;margin-bottom:6px;">👤 Client</div>';
     html +=   '<div style="font-weight:800;color:var(--text-main);font-size:0.92rem;">' + (cli.nom||'—').replace(/</g,'&lt;') + '</div>';
@@ -10123,10 +10130,29 @@ function _devisSettlePayment(devisId, ticketId, montant, mode, montantEspeces, m
 }
 
 // ── Export PDF / Impression ────────────────────────────────────────────────
+// Identité de l'entreprise affichée en haut à gauche des devis / factures : enseigne, raison sociale,
+// adresse, SIRET, téléphone, e-mail — les MÊMES informations que l'en-tête du ticket de caisse
+// (COVO Pro → Admin → « Renseignements — Ticket de caisse », clé partagée covo_settings.rcpt),
+// relues à chaque fois pour toujours afficher la dernière version.
+function _devisShopIdentity() {
+    var st = null; try { st = JSON.parse(localStorage.getItem('covo_settings') || 'null'); } catch (e) {}
+    st = st || (typeof appSettings !== 'undefined' ? appSettings : {}) || {};
+    var rc = st.rcpt || (typeof appSettings !== 'undefined' && appSettings.rcpt) || {};
+    var name = String(rc.shopName || st.shopName || st.companyName || 'Mon Entreprise').trim();
+    var legal = String(st.companyName || '').trim();
+    var lines = [];
+    if (legal && legal.toLowerCase() !== name.toLowerCase()) lines.push(legal);
+    if (rc.address) String(rc.address).split(/\r?\n/).forEach(function (l) { if (l.trim()) lines.push(l.trim()); });
+    if (rc.siret) lines.push('SIRET ' + rc.siret);
+    if (rc.phone) lines.push('📞 ' + rc.phone);
+    if (rc.email) lines.push('✉️ ' + rc.email);
+    return { name: name, lines: lines, hasAddress: !!String(rc.address || '').trim() };
+}
 window._devisGeneratePDF = function(id) {
     const d = _devisGetAll().find(function(x){ return x.id === id; });
     if (!d) { showScanToast('Devis introuvable'); return; }
-    const shopName = (appSettings.companyName || appSettings.shopName || 'Mon Entreprise');
+    const _devisIdt = _devisShopIdentity();
+    const shopName = _devisIdt.name;
     // Logo personnalisé si configuré dans les paramètres, sinon le logo COVO par défaut (toujours affiché en haut du devis).
     const logoUrl = _devisLogoSrc();
     const expDate = _devisExpiryDate(d);
@@ -10148,6 +10174,7 @@ window._devisGeneratePDF = function(id) {
         + '.head{display:flex;justify-content:space-between;align-items:flex-start;border-bottom:3px solid #2c6fad;padding-bottom:14px;margin-bottom:20px;}'
         + '.head img{max-height:56px;max-width:180px;object-fit:contain;}'
         + '.shop{font-size:16px;font-weight:900;color:#2c6fad;}'
+        + '.shopinfo{font-size:10.5px;color:#555;line-height:1.5;margin-top:3px;max-width:300px;}'
         + 'h1{font-size:24px;letter-spacing:2px;color:#1e2d3d;margin:0;}'
         + '.meta{font-size:11px;color:#555;text-align:right;line-height:1.6;}'
         + '.badge{display:inline-block;padding:3px 10px;border-radius:12px;font-size:10px;font-weight:700;margin-top:4px;}'
@@ -10172,6 +10199,7 @@ window._devisGeneratePDF = function(id) {
         + '<div class="head"><div>'
         +   (logoUrl ? ('<img src="' + logoUrl.replace(/"/g,'') + '" alt="logo"><br>') : '')
         +   '<div class="shop">' + shopName.replace(/</g,'&lt;') + '</div>'
+        +   (_devisIdt.lines.length ? '<div class="shopinfo">' + _devisIdt.lines.map(function(l){ return String(l).replace(/</g,'&lt;'); }).join('<br>') + '</div>' : '')
         + '</div><div>'
         +   '<h1>' + docLabel.toUpperCase() + '</h1>'
         +   '<div class="meta">N° ' + d.numero + '<br>'
