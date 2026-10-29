@@ -3177,6 +3177,21 @@ window._promoPrice = function(base, promo, cost) {
     return base * (1 - promo / 100);
 };
 
+// ── % de remise RÉEL affiché (la promo « % » est un curseur entre prix de vente et prix d'achat :
+//    25,40 € → 22,50 € = -11 % réel, même si le curseur est à 51,79 %)
+window._promoPctOf = function(base, newPrice) {
+    base = parseFloat(base) || 0; newPrice = parseFloat(newPrice);
+    if (!(base > 0) || isNaN(newPrice) || newPrice >= base) return 0;
+    return Math.max(1, Math.round((1 - newPrice / base) * 100));
+};
+window._promoRealPct = function(p) {
+    if (!p) return 0;
+    var pc = parseFloat(p.promo) || 0; if (!(pc > 0)) return 0;
+    var b = parseFloat(p.unitType === 'kg' ? p.pricePerKg : p.price) || 0;
+    if (!(b > 0)) return Math.round(pc);
+    return window._promoPctOf(b, window._promoPrice(b, pc, p.costPrice));
+};
+
 async function resizeImage(file) {
     return new Promise((resolve, reject) => {
         const reader = new FileReader();
@@ -3565,7 +3580,7 @@ function renderCatalogueTab() {
             <td>${img}</td>
             <td><strong style="font-size:0.87rem;">${p.name}</strong>${isKg?'<br><span style="font-size:0.7rem;color:#1565c0;">⚖️ /kg</span>':''}</td>
             <td><span style="font-size:0.8rem;color:var(--gray,#7f8c8d);">${p.category||'—'}</span></td>
-            <td><strong style="color:var(--success,#27ae60);font-size:0.88rem;">${priceDisplay}</strong>${disc>0?`<br><span style="font-size:0.72rem;color:#e74c3c;">-${disc}%</span>`:''}</td>
+            <td><strong style="color:var(--success,#27ae60);font-size:0.88rem;">${priceDisplay}</strong>${disc>0?`<br><span style="font-size:0.72rem;color:#e74c3c;">-${window._promoRealPct(p)}%</span>`:''}</td>
             <td><strong style="color:${stockColor};font-size:0.88rem;">${stockDisplay}</strong></td>
             <td>${(()=>{
                 const bc = (p.barcode||'').trim();
@@ -3575,7 +3590,7 @@ function renderCatalogueTab() {
                     : `<code style="font-size:0.74rem;color:var(--gray,#7f8c8d);">${bc||'—'}</code>`;
             })()}</td>
             <td>${dlcHtml}</td>
-            <td><span style="font-size:0.82rem;">${disc>0?`-${disc}%`:'—'}</span></td>
+            <td><span style="font-size:0.82rem;" title="Remise réelle sur le prix de vente (réglage ${disc} %)">${disc>0?`-${window._promoRealPct(p)}%`:'—'}</span></td>
             <td>${nightBadge}</td>
             <td>${stateBadge}</td>
             <td>
