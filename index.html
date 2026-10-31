@@ -13202,5 +13202,417 @@ function _bilanInit() {
 })();
 </script>
 
+<script>
+/* ═══ COVO — GUIDES « i » : un guide complet, pas à pas, sur chaque onglet / section ═══ */
+(function () {
+    'use strict';
+    /* Éléments communs aux applications satellites (barre du haut + Google Drive) */
+    var HDR_ZONES = [
+        ['👤', 'Utilisateur connecté', 'Votre nom et votre rôle (admin, caissier). Les droits sont les mêmes que dans COVO Pro.'],
+        ['💾', 'Sauvegarde Google Drive', 'Le bouton [[💾]] envoie toutes les modifications sur Google Drive. Il affiche ✓ quand tout est sauvegardé, ou le nombre de modifications en attente.'],
+        ['☁️', 'Google Drive', 'Ouvre les réglages de connexion Google Drive (même Client ID que COVO Pro).'],
+        ['📲', 'Installer', 'Installe l’application sur l’ordinateur ou le téléphone (icône sur le bureau / l’écran d’accueil).'],
+        ['🌙', 'Thème', 'Bascule entre le mode clair et le mode sombre.'],
+        ['⚠️', 'Bandeau d’anomalie (en bas)', 'S’affiche si Google Drive n’est pas connecté : [[🔄 Se reconnecter]] relance la connexion, [[ⓘ]] donne le détail. Rien n’est perdu : les modifications restent sur l’appareil et partent dès la reconnexion.']
+    ];
+    var HDR_STEP = { t: 'Sauvegarder et rester synchronisé avec COVO Pro', s: [
+        'Les données (produits, ventes, clients…) sont **partagées avec COVO Pro** et les autres applications COVO : une modification faite ici y apparaît aussi.',
+        'Chaque modification est enregistrée tout de suite sur l’appareil.',
+        'Cliquez sur [[💾]] pour envoyer immédiatement sur Google Drive (le chiffre indique les modifications en attente).',
+        'Si le bandeau « ⚠️ Anomalie : non connecté » apparaît, cliquez sur [[🔄 Se reconnecter]] ; si le Client ID manque, ouvrez [[☁️ Google Drive]] et collez le même Client ID que dans COVO Pro.',
+        'Au premier lancement, la fenêtre « Anomalie » propose aussi [[Continuer sans connexion]] : vous travaillez alors en local, la sauvegarde reprendra à la reconnexion.'] };
+    var HDR_FAQ = [['Je ne vois pas les dernières modifications faites dans COVO Pro ?', 'Rafraîchissez la page. Sur un autre appareil, la mise à jour passe par Google Drive : vérifiez que [[💾]] affiche ✓ sur l’appareil d’origine.']];
+    function gs(t) { return function () { if (typeof gstShowTab === 'function') gstShowTab(t); }; }
+    var APP = { key: 'gest', name: 'Gestion Pro', guides: [
+    {
+        id: 'general', grp: 'Démarrer', ic: '⚙️', t: 'Prise en main de Gestion Pro',
+        sub: 'Le back-office du magasin : catalogue, stock, équipe, documents, réglages.',
+        intro: '**Gestion Pro** rassemble la gestion du magasin. Le **menu de gauche** est organisé en rubriques : CATALOGUE (Produits & catalogue, Étiquettes), STOCK (Inventaire, Historique du stock, Échéances), ÉQUIPE (Heures de travail, Utilisateurs), VENTES & DOCUMENTS (Devis / Factures, Tickets oubliés, Bilan) et SYSTÈME (Configuration). Chaque entrée du menu a son « i ».',
+        zones: [
+            ['🧭', 'Menu de gauche', 'Un clic ouvre la section ; les pastilles signalent ce qui demande une action (ex. nombre de ruptures, « ! » si aucun inventaire). [[⇤]] réduit / agrandit le menu.'],
+            ['🧾', 'Fil d’Ariane et résumé', 'En haut de chaque section : « GESTION PRO › RUBRIQUE », une phrase d’explication et des chiffres clés.']
+        ].concat(HDR_ZONES),
+        steps: [HDR_STEP], tips: ['L’inventaire et la correction rapide des stocks bas sont aussi disponibles dans COVO Pro (onglet Gestion → 📦 Inventaire).'], faq: HDR_FAQ
+    },
+    {
+        id: 'home', grp: 'Rubriques', ic: '🏠', t: 'Vue d’ensemble', go: gs('gst-home'),
+        sub: 'L’état du magasin en un coup d’œil.',
+        intro: 'La **Vue d’ensemble** est la page d’accueil : chiffres du jour, choses à traiter en priorité, ventes des 14 derniers jours et accès à tous les modules.',
+        zones: [
+            ['⚡', 'Raccourcis', '[[➕ Nouveau produit]], [[📋 Inventaire]], [[🧾 Nouveau devis]], [[🏷️ Étiquettes]].'],
+            ['📊', 'Indicateurs', 'Chiffre du jour, Ce mois-ci (vs mois dernier), Valeur du stock (prix d’achat), Ruptures, Échéances, À encaisser (factures).'],
+            ['📌', 'À traiter', 'Liste classée du plus urgent au moins urgent (ruptures, stocks bas, inventaire à faire…) avec [[Ouvrir ›]].'],
+            ['📈', 'Chiffre des 14 derniers jours', 'Ventes de la caisse jour par jour ; **Équipe aujourd’hui** : qui a vendu.'],
+            ['🧭', 'Tous les modules', 'Une carte par module avec son état (ex. « 35 articles · 19 en rupture »).']
+        ],
+        steps: [{ t: 'Commencer la journée', s: ['Lisez **📌 À traiter** et cliquez sur [[Ouvrir ›]] pour chaque point.', 'Vérifiez le chiffre du jour et du mois.', 'Utilisez les raccourcis pour les actions fréquentes.'] }], tips: [], faq: []
+    },
+    {
+        id: 'produits', grp: 'Rubriques', ic: '📦', t: 'Produits & catalogue', go: gs('gst-produits'),
+        sub: 'Tous les articles : prix, stock, codes-barres, DLC, promos — filtrer, trier, modifier.',
+        intro: 'La section **Produits & catalogue** présente tous les articles sous forme de **tableau** avec des filtres, des statistiques de stock et les actions de modification.',
+        zones: [
+            ['🔍', 'Filtres', 'Recherche (nom, code-barres, catégorie), catégorie, état du stock (en stock, stock bas, épuisé), type (à l’unité, au kg).'],
+            ['🛠️', 'Actions', '[[➕ Ajouter un produit]], [[📁 Catégories]] (créer, renommer, supprimer), [[⬇️ Exporter CSV]].'],
+            ['📊', 'Statistiques', 'Articles affichés, valeur du stock, en stock, stock bas, épuisés, masqués ; graphiques « Valeur du stock par catégorie » et « État du stock ».'],
+            ['📋', 'Tableau', 'N°, image, nom, catégorie, prix, stock, code-barres, DLC, promo, 🌙 nuit, état (✅ Actif / 👁️ Masqué) et [[✏️ Éditer]] / [[🗑️]]. Cliquez sur un en-tête (↕️) pour trier. Les articles désactivés sont regroupés en bas.']
+        ],
+        steps: [
+            { t: 'Ajouter un produit', s: ['Cliquez sur [[➕ Ajouter un produit]].', 'Renseignez le **nom**, le **type de vente** (à l’unité ou au poids), le **prix unitaire**, le **prix d’achat** (pour le calcul du bénéfice), le code-barres, le stock initial, la catégorie, la DLC, la promotion, le statut (actif / masqué) et l’image (lien ou fichier).', 'Cliquez sur [[💾 Enregistrer]].'] },
+            { t: 'Modifier un produit', s: ['Filtrez ou recherchez l’article.', 'Cliquez sur [[✏️ Éditer]] sur sa ligne, modifiez, enregistrez.', 'Pour masquer / réactiver rapidement : **double-cliquez** sur l’état ✅ Actif / 👁️ Masqué.', '[[🗑️]] supprime l’article.'] },
+            { t: 'Gérer les catégories', s: ['Cliquez sur [[📁 Catégories]].', '[[➕ Créer]] une catégorie ; [[✏️]] la renomme (tous les articles sont mis à jour) ; [[🗑️]] la supprime en vous laissant choisir où déplacer ses articles.'] },
+            { t: 'Exporter le catalogue', s: ['Appliquez les filtres voulus.', 'Cliquez sur [[⬇️ Exporter CSV]] (ouvrable dans Excel / LibreOffice).'] }
+        ], tips: ['La case en tête du tableau sélectionne tous les articles affichés pour une action groupée.'], faq: []
+    },
+    {
+        id: 'etiquettes', grp: 'Rubriques', ic: '🏷️', t: 'Étiquettes', go: gs('gst-etiquettes'),
+        sub: 'Format, contenu et impression des étiquettes de prix.',
+        intro: 'La section **Étiquettes** règle le modèle d’étiquette de prix (utilisé aussi par COVO Pro) et permet d’en imprimer en lot.',
+        zones: [
+            ['📐', 'Format', '50 × 30 mm (standard), 57 × 32 mm (caisse), 62 × 29 mm (Brother DK), 100 × 50 mm (grand format) ou format personnalisé (L × H, [[+ Ajouter]]).'],
+            ['📋', 'Contenu', 'Nom du produit, prix, code-barre, catégorie, nom du magasin (à cocher).'],
+            ['🔄', 'Rotation', '[[⬆️ Portrait]] ou [[↩️ Paysage]].'],
+            ['👁', 'Aperçu', 'Rendu de l’étiquette ; [[🔄 Rafraîchir]].'],
+            ['🖨️', 'Impression', '[[🖨️ Test d’impression]] et [[🏷️ Impression en lot]].']
+        ],
+        steps: [
+            { t: 'Régler le modèle', s: ['Choisissez le format correspondant à votre rouleau d’étiquettes.', 'Cochez les informations à imprimer.', 'Choisissez l’orientation et contrôlez l’aperçu.', 'Faites un [[🖨️ Test d’impression]].'] },
+            { t: 'Imprimer plusieurs étiquettes', s: ['Cliquez sur [[🏷️ Impression en lot]].', 'Cochez les produits ([[Tout sélectionner]] / [[Tout effacer]]) et indiquez la quantité d’étiquettes pour chacun.', 'Lancez l’impression.'] }
+        ], tips: [], faq: []
+    },
+    {
+        id: 'inventaire', grp: 'Rubriques', ic: '📋', t: 'Inventaire', go: gs('gst-inventaire'),
+        sub: 'Compter le stock réel, corriger les écarts, valoriser le stock.',
+        intro: 'La section **Inventaire** permet de compter le stock (complet ou par échantillon), de corriger les écarts et de suivre la valeur du stock. Les inventaires sont partagés avec COVO Pro.',
+        zones: [
+            ['📊', 'Indicateurs', 'Articles actifs, stock en unités et en kg, ruptures, valeur du stock, dernier inventaire.'],
+            ['🛠️', 'Boutons', '[[🔍 Lancer un inventaire]], [[🎲 Inventaire aléatoire]], [[💰 Valorisation]], [[⚠️ Alertes réappro]], [[📜 Historique]], [[🛒 Ventes récentes]].']
+        ],
+        steps: [
+            { t: 'Faire un inventaire', s: ['Cliquez sur [[🔍 Lancer un inventaire]].', 'Scannez ou recherchez chaque article et saisissez la quantité comptée ; la progression « X / Y comptés » avance.', 'Les écarts s’affichent en direct (✅ conforme, surplus, manquant).', 'Cliquez sur [[✅ Valider l’inventaire]] ; s’il manque des articles, une fenêtre récapitule les écarts avant de les enregistrer.'] },
+            { t: 'Inventaire aléatoire', s: ['Cliquez sur [[🎲 Inventaire aléatoire]] : un échantillon de produits est tiré au sort.', 'Comptez uniquement ces produits, puis validez.'] },
+            { t: 'Consulter les résultats', s: ['[[💰 Valorisation]] : valeur au prix d’achat / de vente et marge potentielle par catégorie.', '[[⚠️ Alertes réappro]] : produits sous le seuil critique.', '[[📜 Historique]] : inventaires passés, cliquables pour le détail.'] }
+        ], tips: ['Dans COVO Pro (Gestion → Inventaire), vous pouvez en plus indiquer pour chaque écart s’il s’agit d’une **perte** ou d’une **erreur de saisie**, et corriger un stock bas sans inventaire.'], faq: []
+    },
+    {
+        id: 'stockhist', grp: 'Rubriques', ic: '📈', t: 'Historique du stock', go: gs('gst-stockhist'),
+        sub: 'Chaque mouvement de stock : ventes, pertes, appros, ajustements, retours.',
+        intro: 'La section **Historique du stock** liste tous les mouvements de stock de tous les articles, avec des totaux et un graphique sur 30 jours.',
+        zones: [
+            ['📅', 'Période', '7 jours, 30 jours, 90 jours, 1 an, Tout ; recherche (produit, catégorie, raison) ; [[⬇ Export CSV]].'],
+            ['📊', 'Totaux', '🛒 Ventes (CA), ⚠️ Pertes (valeur), 📦 Appros, ✏️ Ajustements (inventaire + manuel).'],
+            ['📈', 'Évolution sur 30 jours', 'Ventes (€), pertes (€), appros (unités).'],
+            ['🏷️', 'Filtres', 'Tous, 🛒 Ventes, ⚠️ Pertes, 📦 Appros, ✏️ Ajustements, ↩️ Retours.'],
+            ['📋', 'Mouvements', 'Date, article, avant → après, type, motif (ex. « ✏️ Erreur de saisie »), utilisateur.']
+        ],
+        steps: [{ t: 'Comprendre un écart de stock', s: ['Recherchez l’article.', 'Choisissez la période.', 'Filtrez par type (pertes, ajustements…).', 'Lisez le motif et l’auteur de chaque mouvement.', 'Exportez en CSV si besoin.'] }], tips: [], faq: []
+    },
+    {
+        id: 'echeances', grp: 'Rubriques', ic: '⏳', t: 'Échéances', go: gs('gst-echeances'),
+        sub: 'Dates limites (DLC / DLUO) : expirés, urgents, à venir.',
+        intro: 'La section **Échéances** suit les dates limites des articles et la tendance des expirations à venir.',
+        zones: [
+            ['🔍', 'Filtres', 'Recherche, état (Expirés, Urgent ≤ 3 j, Bientôt ≤ 7 j, OK), catégorie.'],
+            ['🛠️', 'Actions', '[[➕ Ajouter article]], [[📥 Importer tous les produits]] (ajoute tout le catalogue), [[⬇️ CSV]].'],
+            ['📊', 'Synthèse', 'Compteurs 🔴 🟠 🟡 🟢, tendance des expirations (8 prochaines semaines), répartition par état.'],
+            ['📋', 'Tableau', 'Article, référence, catégorie, DLC, délai restant, stock, emplacement, état, [[✏️]] / [[🗑️]].'],
+            ['🏷️', 'Catégories d’échéances', 'Liste des catégories utilisées par la fenêtre « Nouvelle échéance » : [[➕ Ajouter]], [[×]] pour supprimer, [[🔄 Réinitialiser]].']
+        ],
+        steps: [
+            { t: 'Suivre toutes les DLC', s: ['Cliquez sur [[📥 Importer tous les produits]].', 'Complétez les « DLC à définir » avec [[✏️]].', 'Filtrez sur Expirés / Urgent chaque jour.'] },
+            { t: 'Ajouter une échéance', s: ['[[➕ Ajouter article]] : article, référence, catégorie, date limite, stock, emplacement.', 'Enregistrez.'] }
+        ], tips: [], faq: []
+    },
+    {
+        id: 'workhours', grp: 'Rubriques', ic: '🕐', t: 'Heures de travail', go: gs('gst-workhours'),
+        sub: 'Heures d’ouverture réelles, affluence et activité par caissier, d’après les ventes.',
+        intro: 'La section **Heures de travail** déduit l’activité de l’équipe à partir des tickets : heure du premier et du dernier ticket, affluence, jours travaillés, chiffre par caissier.',
+        zones: [
+            ['🎛️', 'Sélection', 'Année, mois ([[📅 Tous les mois]] ou un mois), caissier ([[👥 Tous]] ou un caissier), [[👁️ Aperçu]] et [[📄 PDF]] du rapport.'],
+            ['📊', 'Indicateurs', 'Ouverture moyenne (1er ticket), fermeture moyenne (dernier ticket), durée moyenne par jour, total tickets, jours travaillés, tickets / jour, heure de pointe, CA total, CA moyen / jour.'],
+            ['📈', 'Graphiques', 'Distribution horaire (tickets par heure, heure de pointe en rouge), moyenne hebdomadaire, fréquentation mensuelle.'],
+            ['📆', 'Tableaux', 'Fréquentation par jour de la semaine (écart vs moyenne) et détail journalier.']
+        ],
+        steps: [{ t: 'Faire le point sur un caissier', s: ['Choisissez l’année, le mois et le caissier.', 'Lisez ses heures moyennes d’ouverture / fermeture et son chiffre.', 'Cliquez sur [[👁️ Aperçu]] puis [[📄 PDF]] pour garder le rapport.'] }],
+        tips: ['Les heures sont calculées sur les tickets : un poste sans vente n’apparaît pas.'], faq: []
+    },
+    {
+        id: 'users', grp: 'Rubriques', ic: '👥', t: 'Utilisateurs', go: gs('gst-users'),
+        sub: 'Comptes, codes PIN, photos et permissions des caissiers.',
+        intro: 'La section **Utilisateurs** gère les comptes (caissiers et administrateurs) qui se connectent à COVO Pro et aux applications, ainsi que les droits de chaque caissier.',
+        zones: [
+            ['👤', 'Liste des comptes', 'Rôle (👑 Admin / 💼 Caissier), code PIN, e-mail, téléphone, mode 👁️ Lecture seule ; boutons [[✏️]], [[🗑️]] et le cadenas ([[🔓]] passer en lecture seule / [[👁️]] repasser en lecture-écriture).'],
+            ['➕', 'Ajouter un utilisateur', 'Nom, code PIN, e-mail et téléphone (facultatifs), rôle, photo de profil.'],
+            ['🔐', 'Permissions des caissiers', 'Par caissier : [[✏️ Droits d’édition]] (autoriser l’édition des articles, le retour client, la déclaration de défaut, et les champs modifiables : nom, image, catégorie, code-barres, stock, prix, DLC, promotion) et [[👁️ Onglets visibles]].']
+        ],
+        steps: [
+            { t: 'Créer un compte caissier', s: ['Dans **Ajouter un utilisateur**, saisissez le nom et un code PIN.', 'Ajoutez e-mail / téléphone si besoin, choisissez le rôle 💼 Caissier, ajoutez une photo.', 'Cliquez sur [[➕ Ajouter]].'] },
+            { t: 'Régler les droits d’un caissier', s: ['Dans **🔐 Permissions des caissiers**, cliquez sur le caissier.', 'Onglet [[✏️ Droits d’édition]] : cochez ce qu’il peut faire et les champs qu’il peut modifier ([[✅ Tout autoriser]] / [[❌ Tout refuser]]).', 'Onglet [[👁️ Onglets visibles]] : cochez les onglets de COVO Pro qu’il voit.', 'Les administrateurs ont toujours tous les droits.'] },
+            { t: 'Mettre un compte en lecture seule', s: ['Cliquez sur [[🔓]] sur la ligne du compte : il peut consulter mais ses modifications ne sont pas sauvegardées.', 'Cliquez sur [[👁️]] pour lui rendre la lecture-écriture.'] }
+        ], tips: ['Le code PIN sert à se connecter : choisissez-en un différent pour chaque personne.'], faq: []
+    },
+    {
+        id: 'devis', grp: 'Rubriques', ic: '🧾', t: 'Devis / Factures', go: gs('gst-devis'),
+        sub: 'Créer des devis, les transformer en factures, suivre les règlements.',
+        intro: 'La section **Devis / Factures** crée des devis clients, les suit (brouillon, envoyé, accepté, refusé, expiré), les transforme en factures et imprime le tout en PDF avec vos coordonnées bancaires.',
+        zones: [
+            ['📊', 'Résumé', 'Nombre de documents, devis en attente, factures à régler.'],
+            ['🗂️', 'Vues', '[[🧾 Devis]] / [[✅ Factures]], recherche (client, numéro), filtre de statut, compteurs (en cours, brouillons, envoyés, refusés / expirés).'],
+            ['🏦', 'Coordonnées bancaires', 'Titulaire, banque, IBAN, BIC, affichage sur les documents, [[📋 Copier le RIB]], [[💾 Enregistrer]].']
+        ],
+        steps: [
+            { t: 'Créer un devis', s: ['Cliquez sur [[➕ Nouveau devis]] (numéro automatique, ex. DEV-2026-0001).', 'Renseignez le client, la date, la validité (jours) et le statut.', 'Ajoutez les lignes : [[📦 Depuis le catalogue]] ou [[➕ Ligne libre]] (tapez dans « Désignation » pour retrouver un article).', 'Indiquez quantités et prix ; ajoutez une remise (%) et la TVA si besoin : les totaux se calculent.', 'Notes / conditions, puis [[💾 Enregistrer]] ou [[🖨️ Enregistrer & Générer PDF]].'] },
+            { t: 'Suivre et facturer', s: ['Cliquez sur un devis pour l’aperçu complet : modification, PDF, suppression.', 'Passez-le en « 📤 Envoyé » quand vous l’avez transmis au client.', 'Quand le client accepte, passez-le en « ✅ Accepté » : il devient une **facture** (même document, même numéro) et apparaît dans [[✅ Factures]], où vous suivez son règlement.'] },
+            { t: 'Afficher votre RIB sur les documents', s: ['Remplissez les coordonnées bancaires.', 'Cochez « Afficher sur les devis et factures ».', 'Cliquez sur [[💾 Enregistrer]].'] }
+        ], tips: [], faq: []
+    },
+    {
+        id: 'tickets', grp: 'Rubriques', ic: '🎫', t: 'Tickets oubliés', go: gs('gst-tickets'),
+        sub: 'Ajouter à l’historique des tickets saisis hors ligne.',
+        intro: 'La section **Tickets oubliés** importe des tickets de caisse enregistrés en fichier (.html), par exemple une vente faite hors ligne sur un autre appareil, pour qu’ils comptent dans l’historique des ventes.',
+        zones: [['📂', 'Import', '[[📂 Sélectionner des tickets HTML]] : un ou plusieurs fichiers.']],
+        steps: [{ t: 'Importer un ticket', s: ['Cliquez sur [[📂 Sélectionner des tickets HTML]].', 'Choisissez le ou les fichiers de tickets.', 'Les tickets sont ajoutés à l’historique : montant, articles, caissier, date, et le stock est déduit.'] }],
+        tips: ['Vérifiez dans Historique Pro que le ticket n’existait pas déjà, pour éviter un doublon.'], faq: []
+    },
+    {
+        id: 'bilan', grp: 'Rubriques', ic: '📊', t: 'Bilan', go: gs('gst-bilan'),
+        sub: 'Le résultat de chaque mois : chiffre, achats, encaissements.',
+        intro: 'La section **Bilan** calcule mois par mois le **résultat financier** (chiffre d’affaires − approvisionnements du mois) et le **solde disponible en caisse** (total encaissé − approvisionnements).',
+        zones: [
+            ['📊', 'Indicateurs', 'Résultat cumulé, total encaissé, espèces, carte bancaire, mois suivis.'],
+            ['📈', 'Graphiques (12 mois)', 'Résultat & encaissements ; approvisionnements dépensés et reste dû ; dette des clients fidèles.'],
+            ['📋', 'Tableau mensuel', 'Résultat financier, reste dû fournisseurs, espèces, carte, autres, total encaissé, solde disponible.']
+        ],
+        steps: [{ t: 'Analyser un mois', s: ['Repérez le mois dans le tableau.', 'Cliquez dessus pour voir le détail des produits vendus.', 'Comparez résultat et solde disponible (un achat à crédit fait diverger les deux).'] }],
+        tips: ['Les approvisionnements viennent d’Approvisionnement Pro : saisissez-y tous vos achats pour un bilan juste.'], faq: []
+    },
+    {
+        id: 'config', grp: 'Rubriques', ic: '⚙️', t: 'Configuration', go: gs('gst-config'),
+        sub: 'Objectif du jour, session, plein écran, statistiques, promotions.',
+        intro: 'La section **Configuration** regroupe les réglages généraux partagés avec COVO Pro.',
+        zones: [
+            ['🎯', 'Objectif de vente journalier', 'Montant à atteindre chaque jour (barre « Objectif du jour » de COVO Pro), [[💾 Sauvegarder]].'],
+            ['⏱️', 'Durée de session', 'Minutes d’inactivité avant déconnexion.'],
+            ['🖥️', 'Plein écran automatique', 'Passe en plein écran dès la connexion.'],
+            ['📊', 'Stats sur la fiche produit', 'Autoriser les caissiers à voir le nombre vendu et le CA.'],
+            ['🏷️', 'Promotions', 'Pourcentages de remise proposés dans la fiche produit ([[➕]] pour en ajouter).']
+        ],
+        steps: [{ t: 'Régler l’objectif du jour', s: ['Saisissez le montant (ex. 150).', 'Cliquez sur [[💾 Sauvegarder]] : la barre d’objectif de COVO Pro l’utilise aussitôt.'] }], tips: [], faq: []
+    }
+    ], anchors: [
+        { g: 'general', sel: '.cp-title', mode: 'before' },
+        { g: 'home', sel: '.gpx-it[data-go="gst-home"]' }, { g: 'produits', sel: '.gpx-it[data-go="gst-produits"]' }, { g: 'etiquettes', sel: '.gpx-it[data-go="gst-etiquettes"]' },
+        { g: 'inventaire', sel: '.gpx-it[data-go="gst-inventaire"]' }, { g: 'stockhist', sel: '.gpx-it[data-go="gst-stockhist"]' }, { g: 'echeances', sel: '.gpx-it[data-go="gst-echeances"]' },
+        { g: 'workhours', sel: '.gpx-it[data-go="gst-workhours"]' }, { g: 'users', sel: '.gpx-it[data-go="gst-users"]' }, { g: 'devis', sel: '.gpx-it[data-go="gst-devis"]' },
+        { g: 'tickets', sel: '.gpx-it[data-go="gst-tickets"]' }, { g: 'bilan', sel: '.gpx-it[data-go="gst-bilan"]' }, { g: 'config', sel: '.gpx-it[data-go="gst-config"]' }
+    ] };
+    /* ═══ Moteur commun des guides « i » (satellites COVO Pro) ═══
+       APP = { key, name, guides:[{id,grp,ic,t,sub,intro,zones,steps,tips,faq,go}], anchors:[{g,sel,re,mode}] } */
+    if (window._tgInstalled) return; window._tgInstalled = true;
+    var G = APP.guides, BY = {}; G.forEach(function (g) { BY[g.id] = g; });
+    function $(id) { return document.getElementById(id); }
+    function esc(t) { return String(t == null ? '' : t).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
+    function fmt(t) { return esc(t).replace(/\[\[(.+?)\]\]/g, '<span class="tg-k">$1</span>').replace(/\*\*(.+?)\*\*/g, '<b>$1</b>'); }
+    function plain(g) {
+        var a = [g.t, g.sub, g.intro];
+        (g.zones || []).forEach(function (z) { a.push(z[1], z[2]); });
+        (g.steps || []).forEach(function (s) { a.push(s.t); a = a.concat(s.s); });
+        a = a.concat(g.tips || []); (g.faq || []).forEach(function (f) { a.push(f[0], f[1]); });
+        return a.join(' ').replace(/\[\[|\]\]|\*\*/g, '');
+    }
+    function norm(s) { return String(s || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, ''); }
+
+    var CSS = [
+        '.tg-i{position:absolute;top:4px;left:5px;width:18px;height:18px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font:italic 800 11.5px/1 Georgia,"Times New Roman",serif;background:rgba(59,130,246,.18);color:#2563eb;border:1.5px solid rgba(59,130,246,.75);box-shadow:0 1px 4px rgba(0,0,0,.15);cursor:help;pointer-events:auto!important;z-index:3;transition:transform .15s,background .15s;user-select:none;text-transform:none;letter-spacing:0;flex-shrink:0;}',
+        'body.dark-mode .tg-i,[data-theme=dark] .tg-i{color:#93c5fd;border-color:rgba(147,197,253,.8);background:rgba(59,130,246,.25);}',
+        '.tg-i:hover,.tg-i:focus{transform:scale(1.18);background:#2563eb;color:#fff;outline:none;}',
+        '.tg-i.inl{position:relative;top:auto;left:auto;margin:0 0 0 7px;vertical-align:middle;width:17px;height:17px;font-size:10.5px;}',
+        '.tg-host{position:relative;}',
+        '#tg-ov{position:fixed;inset:0;z-index:2147483000;background:rgba(8,12,24,.62);backdrop-filter:blur(6px);display:flex;align-items:center;justify-content:center;padding:14px;font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;--tb:#fff;--tf:#1f2937;--tm:#64748b;--tl:#e5e7eb;--ts:#f8fafc;--tz:#334155;}',
+        '#tg-ov.dk{--tb:#111827;--tf:#e5e7eb;--tm:#9ca3af;--tl:#374151;--ts:#0b1220;--tz:#cbd5e1;}',
+        '#tg-box{width:min(1080px,100%);height:min(92vh,900px);background:var(--tb);color:var(--tf);border-radius:20px;box-shadow:0 30px 90px rgba(0,0,0,.45);display:grid;grid-template-rows:auto minmax(0,1fr);overflow:hidden;text-align:left;}',
+        '#tg-head{display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:12px 16px;background:linear-gradient(135deg,#1d4ed8,#0f766e);color:#fff;}',
+        '#tg-head h2{margin:0;font-size:1.02rem;font-weight:900;flex:1;min-width:160px;color:#fff;}',
+        '#tg-head input{flex:0 1 280px;min-width:150px;padding:8px 11px;border-radius:10px;border:none;font-size:.84rem;background:rgba(255,255,255,.95);color:#1f2937;}',
+        '#tg-head button{border:1.5px solid rgba(255,255,255,.45);background:rgba(255,255,255,.14);color:#fff;border-radius:10px;padding:7px 11px;font-weight:800;font-size:.78rem;cursor:pointer;font-family:inherit;}',
+        '#tg-head button:hover{background:rgba(255,255,255,.28);}',
+        '#tg-body{display:grid;grid-template-columns:260px minmax(0,1fr);min-height:0;}',
+        '#tg-side{border-right:1px solid var(--tl);overflow:auto;padding:10px 8px;background:var(--ts);}',
+        '#tg-side .gp{font-size:.64rem;font-weight:900;letter-spacing:.06em;text-transform:uppercase;color:var(--tm);margin:10px 8px 4px;}',
+        '#tg-side button{display:flex;align-items:center;gap:8px;width:100%;text-align:left;border:none;background:none;color:var(--tf);padding:7px 9px;border-radius:9px;font-size:.82rem;font-weight:700;cursor:pointer;font-family:inherit;}',
+        '#tg-side button:hover{background:rgba(59,130,246,.1);}',
+        '#tg-side button.on{background:#2563eb;color:#fff;}',
+        '#tg-side .nores{font-size:.78rem;color:var(--tm);padding:10px;}',
+        '#tg-sel{display:none;}',
+        '#tg-main{overflow:auto;padding:18px 22px 26px;color:var(--tf);}',
+        '#tg-main *{color:inherit;}',
+        '#tg-main .hero{display:flex;gap:14px;align-items:flex-start;margin-bottom:12px;}',
+        '#tg-main .hero .ic{font-size:2rem;line-height:1;width:54px;height:54px;border-radius:15px;display:flex;align-items:center;justify-content:center;background:rgba(37,99,235,.12);flex-shrink:0;}',
+        '#tg-main h3{margin:0;font-size:1.25rem;font-weight:900;}',
+        '#tg-main .sub{margin-top:3px;font-size:.84rem;font-weight:700;color:var(--tm);}',
+        '#tg-main .intro{font-size:.9rem;line-height:1.6;background:rgba(37,99,235,.08);border-left:4px solid #2563eb;border-radius:10px;padding:11px 14px;margin:6px 0 16px;}',
+        '#tg-main h4{margin:20px 0 9px;font-size:.98rem;font-weight:900;display:flex;align-items:center;gap:8px;}',
+        '#tg-main .zones{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:9px;}',
+        '#tg-main .zone{border:1px solid var(--tl);border-radius:12px;padding:10px 12px;background:var(--ts);}',
+        '#tg-main .zone b.zt{display:block;font-size:.86rem;margin-bottom:4px;}',
+        '#tg-main .zone p{margin:0;font-size:.8rem;line-height:1.5;color:var(--tz);}',
+        '#tg-main details.st{border:1px solid var(--tl);border-radius:12px;margin-bottom:8px;background:var(--tb);overflow:hidden;}',
+        '#tg-main details.st summary{cursor:pointer;padding:11px 14px;font-weight:900;font-size:.9rem;list-style:none;display:flex;align-items:center;gap:9px;}',
+        '#tg-main details.st summary::-webkit-details-marker{display:none;}',
+        '#tg-main details.st summary .n{flex-shrink:0;width:24px;height:24px;border-radius:50%;background:#2563eb;color:#fff;font-size:.74rem;display:flex;align-items:center;justify-content:center;}',
+        '#tg-main details.st summary .ch{margin-left:auto;transition:transform .2s;color:var(--tm);}',
+        '#tg-main details.st[open] summary .ch{transform:rotate(90deg);}',
+        '#tg-main details.st ol{margin:0;padding:2px 18px 14px 50px;}',
+        '#tg-main details.st li{font-size:.86rem;line-height:1.6;margin:5px 0;}',
+        '#tg-main ul.tips{margin:0;padding-left:20px;}#tg-main ul.tips li{font-size:.86rem;line-height:1.6;margin:4px 0;}',
+        '#tg-main .faq{border-bottom:1px dashed var(--tl);padding:8px 2px;}#tg-main .faq b{display:block;font-size:.87rem;}#tg-main .faq p{margin:3px 0 0;font-size:.84rem;line-height:1.55;color:var(--tz);}',
+        '#tg-main .nav{display:flex;justify-content:space-between;gap:8px;margin-top:22px;flex-wrap:wrap;}',
+        '#tg-main .nav button{border:1.5px solid var(--tl);background:var(--tb);color:var(--tf);border-radius:10px;padding:8px 12px;font-weight:800;font-size:.8rem;cursor:pointer;font-family:inherit;}',
+        '#tg-ov .tg-k{display:inline-block;padding:0 6px;margin:0 1px;border-radius:6px;background:rgba(100,116,139,.15);border:1px solid rgba(100,116,139,.3);font-weight:800;font-size:.92em;white-space:nowrap;}',
+        '#tg-main mark{background:#fde047;color:#111;border-radius:3px;padding:0 1px;}',
+        '@media (max-width:760px){#tg-body{grid-template-columns:1fr;grid-template-rows:auto minmax(0,1fr);}#tg-side{display:none;}#tg-sel{display:block;width:calc(100% - 20px);margin:8px 10px 0;padding:8px;border-radius:10px;border:1.5px solid var(--tl);background:var(--tb);color:var(--tf);font-weight:800;}#tg-main{padding:12px 14px 22px;}#tg-head input{flex:1 1 100%;order:3;}#tg-ov{padding:0;}#tg-box{height:100vh;height:100dvh;border-radius:0;}#tg-ov .tg-k{white-space:normal;}}',
+        '@media print{body > *:not(#tg-ov){display:none!important;}#tg-ov{position:static;background:none;padding:0;backdrop-filter:none;}#tg-box{height:auto;box-shadow:none;display:block;}#tg-head,#tg-side,#tg-sel,#tg-main .nav{display:none!important;}#tg-body{display:block;}#tg-main{overflow:visible;}#tg-main details.st{break-inside:avoid;}}'
+    ].join('\n');
+    function ensureCss() { if (!$('tg-css')) { var s = document.createElement('style'); s.id = 'tg-css'; s.textContent = CSS; (document.head || document.documentElement).appendChild(s); } }
+
+    function isDark() {
+        try {
+            var b = document.body, h = document.documentElement;
+            if (b.classList.contains('dark-mode') || h.getAttribute('data-theme') === 'dark' || b.getAttribute('data-theme') === 'dark') return true;
+            if (h.getAttribute('data-theme') === 'light' || b.getAttribute('data-theme') === 'light') return false;
+            var c = getComputedStyle(b).backgroundColor.match(/\d+(\.\d+)?/g);
+            if (c && (c.length < 4 || +c[3] > 0)) return (0.299 * c[0] + 0.587 * c[1] + 0.114 * c[2]) < 110;
+            return window.matchMedia && matchMedia('(prefers-color-scheme: dark)').matches;
+        } catch (e) { return false; }
+    }
+
+    var cur = G[0].id, q = '';
+    function sideList() {
+        var nq = norm(q), groups = {}, order = [];
+        G.forEach(function (g) {
+            if (nq && norm(plain(g)).indexOf(nq) < 0) return;
+            if (!groups[g.grp]) { groups[g.grp] = []; order.push(g.grp); }
+            groups[g.grp].push(g);
+        });
+        if (!order.length) return '<div class="nores">Aucun guide ne contient « ' + esc(q) + ' ».</div>';
+        return order.map(function (gp) {
+            return '<div class="gp">' + esc(gp) + '</div>' + groups[gp].map(function (g) { return '<button type="button" data-g="' + g.id + '" class="' + (g.id === cur ? 'on' : '') + '"><span>' + g.ic + '</span><span>' + esc(g.t) + '</span></button>'; }).join('');
+        }).join('');
+    }
+    function highlight(root) {
+        var nq = q.trim(); if (nq.length < 2) return;
+        var re = new RegExp('(' + nq.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + ')', 'gi');
+        var w = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, null), nodes = [], n;
+        while ((n = w.nextNode())) { re.lastIndex = 0; if (re.test(n.nodeValue)) nodes.push(n); }
+        nodes.forEach(function (t) {
+            var span = document.createElement('span'); re.lastIndex = 0; span.innerHTML = esc(t.nodeValue).replace(re, '<mark>$1</mark>');
+            t.parentNode.replaceChild(span, t);
+            var d = span.closest('details'); if (d) d.open = true;
+        });
+        var m = root.querySelector('mark'); if (m) m.scrollIntoView({ block: 'center' });
+    }
+    function mainHtml(g) {
+        var idx = G.indexOf(g), prev = G[idx - 1], next = G[idx + 1];
+        var h = '<div class="hero"><div class="ic">' + g.ic + '</div><div><h3>' + esc(g.t) + '</h3><div class="sub">' + fmt(g.sub) + '</div></div></div><div class="intro">' + fmt(g.intro) + '</div>';
+        if (g.zones && g.zones.length) h += '<h4>🧩 Ce que vous trouvez ici</h4><div class="zones">' + g.zones.map(function (z) { return '<div class="zone"><b class="zt">' + z[0] + ' ' + fmt(z[1]) + '</b><p>' + fmt(z[2]) + '</p></div>'; }).join('') + '</div>';
+        if (g.steps && g.steps.length) h += '<h4>🪜 Comment l’utiliser — pas à pas</h4>' + g.steps.map(function (s, i) {
+            return '<details class="st"' + (i === 0 ? ' open' : '') + '><summary><span class="n">' + (i + 1) + '</span>' + fmt(s.t) + '<span class="ch">›</span></summary><ol>' + s.s.map(function (x) { return '<li>' + fmt(x) + '</li>'; }).join('') + '</ol></details>';
+        }).join('');
+        if (g.tips && g.tips.length) h += '<h4>💡 Astuces</h4><ul class="tips">' + g.tips.map(function (x) { return '<li>' + fmt(x) + '</li>'; }).join('') + '</ul>';
+        if (g.faq && g.faq.length) h += '<h4>❓ Questions fréquentes</h4>' + g.faq.map(function (f) { return '<div class="faq"><b>' + fmt(f[0]) + '</b><p>' + fmt(f[1]) + '</p></div>'; }).join('');
+        h += '<div class="nav">' + (prev ? '<button type="button" data-g="' + prev.id + '">‹ ' + prev.ic + ' ' + esc(prev.t) + '</button>' : '<span></span>') + (next ? '<button type="button" data-g="' + next.id + '">' + next.ic + ' ' + esc(next.t) + ' ›</button>' : '') + '</div>';
+        return h;
+    }
+    function render() {
+        var g = BY[cur] || G[0];
+        $('tg-side').innerHTML = sideList();
+        $('tg-sel').innerHTML = G.map(function (x) { return '<option value="' + x.id + '"' + (x.id === cur ? ' selected' : '') + '>' + x.ic + ' ' + esc(x.t) + '</option>'; }).join('');
+        var m = $('tg-main'); m.innerHTML = mainHtml(g); m.scrollTop = 0; highlight(m);
+        $('tg-go').style.display = g.go ? '' : 'none';
+        $('tg-title').textContent = 'ℹ️ ' + APP.name + ' — ' + g.t;
+    }
+    function onKey(e) { if (e.key === 'Escape') { e.stopPropagation(); e.preventDefault(); close(); } }
+    function close() { var ov = $('tg-ov'); if (ov) ov.style.display = 'none'; document.removeEventListener('keydown', onKey, true); }
+    function open(id) {
+        ensureCss();
+        cur = BY[id] ? id : G[0].id;
+        var ov = $('tg-ov');
+        if (!ov) {
+            ov = document.createElement('div'); ov.id = 'tg-ov'; ov.setAttribute('role', 'dialog'); ov.setAttribute('aria-modal', 'true');
+            ov.innerHTML = '<div id="tg-box"><div id="tg-head"><h2 id="tg-title">ℹ️ Guide</h2>'
+                + '<input id="tg-q" type="search" placeholder="🔎 Rechercher dans les guides…" autocomplete="off">'
+                + '<button type="button" id="tg-go" title="Afficher l’écran expliqué">↗ Y aller</button>'
+                + '<button type="button" id="tg-pr" title="Imprimer ce guide">🖨️ Imprimer</button>'
+                + '<button type="button" id="tg-x" title="Fermer (Échap)">✕</button></div>'
+                + '<div id="tg-body"><nav id="tg-side" aria-label="Guides"></nav><div style="display:flex;flex-direction:column;min-height:0;"><select id="tg-sel" aria-label="Choisir un guide"></select><div id="tg-main"></div></div></div></div>';
+            document.body.appendChild(ov);
+            ov.addEventListener('click', function (e) {
+                if (e.target === ov) { close(); return; }
+                var b = e.target.closest('[data-g]'); if (b) { cur = b.getAttribute('data-g'); render(); return; }
+                if (e.target.closest('#tg-x')) close();
+                else if (e.target.closest('#tg-pr')) { document.querySelectorAll('#tg-main details').forEach(function (d) { d.open = true; }); window.print(); }
+                else if (e.target.closest('#tg-go')) { var g = BY[cur]; close(); try { if (g && g.go) g.go(); } catch (er) {} }
+            });
+            $('tg-sel').addEventListener('change', function () { cur = this.value; render(); });
+            var qt = null;
+            $('tg-q').addEventListener('input', function () {
+                var v = this.value; clearTimeout(qt);
+                qt = setTimeout(function () {
+                    q = v;
+                    if (q && norm(plain(BY[cur])).indexOf(norm(q)) < 0) { var f = G.filter(function (g) { return norm(plain(g)).indexOf(norm(q)) >= 0; })[0]; if (f) cur = f.id; }
+                    render();
+                }, 220);
+            });
+        }
+        ov.classList.toggle('dk', isDark());
+        ov.style.display = 'flex';
+        q = ''; $('tg-q').value = '';
+        render();
+        document.addEventListener('keydown', onKey, true);
+        setTimeout(function () { var x = $('tg-x'); if (x) x.focus(); }, 30);
+    }
+    window.covoTabGuide = open;
+
+    function badge(id, inline) {
+        var s = document.createElement('span');
+        s.className = 'tg-i' + (inline ? ' inl' : ''); s.textContent = 'i';
+        s.setAttribute('role', 'button'); s.setAttribute('tabindex', '0'); s.setAttribute('data-tg', id);
+        s.title = 'Guide : ' + BY[id].t + ' — ce que contient cet écran et comment l’utiliser';
+        s.setAttribute('aria-label', s.title);
+        return s;
+    }
+    function ownText(el) { var t = ''; for (var n = el.firstChild; n; n = n.nextSibling) if (n.nodeType === 3) t += n.nodeValue; return t.replace(/\s+/g, ' ').trim(); }
+    function inject() {
+        ensureCss();
+        APP.anchors.forEach(function (a) {
+            if (!BY[a.g]) return;
+            var list = Array.prototype.slice.call(document.querySelectorAll(a.sel));
+            if (a.re) { var re = new RegExp(a.re, 'i'); list = list.filter(function (el) { return re.test(a.full ? (el.innerText || el.textContent || '').replace(/\s+/g, ' ').trim() : ownText(el)); }); }
+            if (a.first) list = list.slice(0, 1);
+            list.forEach(function (el) {
+                if (el.querySelector(':scope > .tg-i[data-tg="' + a.g + '"]')) return;
+                if (a.mode === 'corner') { if (getComputedStyle(el).position === 'static') el.classList.add('tg-host'); el.appendChild(badge(a.g, false)); }
+                else if (a.mode === 'before' && el.querySelector(':scope > small')) el.insertBefore(badge(a.g, true), el.querySelector(':scope > small'));
+                else el.appendChild(badge(a.g, true));
+            });
+        });
+    }
+    function onBadge(e) {
+        var s = e.target && e.target.closest && e.target.closest('.tg-i'); if (!s) return;
+        e.preventDefault(); e.stopPropagation(); if (e.stopImmediatePropagation) e.stopImmediatePropagation();
+        if (e.type === 'click' || (e.type === 'keydown' && (e.key === 'Enter' || e.key === ' '))) open(s.getAttribute('data-tg'));
+    }
+    document.addEventListener('click', onBadge, true);
+    document.addEventListener('keydown', function (e) { if (e.target && e.target.classList && e.target.classList.contains('tg-i')) onBadge(e); }, true);
+    ['mousedown', 'pointerdown', 'touchstart', 'dblclick'].forEach(function (t) { document.addEventListener(t, function (e) { if (e.target && e.target.closest && e.target.closest('.tg-i')) e.stopPropagation(); }, true); });
+
+    var iT = null;
+    function boot() {
+        inject();
+        new MutationObserver(function () { if (iT) return; iT = setTimeout(function () { iT = null; inject(); }, 300); }).observe(document.body, { childList: true, subtree: true });
+    }
+    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot); else boot();
+})();
+</script>
 </body>
 </html>
